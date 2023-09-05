@@ -12,7 +12,7 @@ CWD = Path.cwd()
 
 def move(src, dest):
 
-    print(str(src), "->", str(dest))
+    print(src, "->", dest)
     src.replace(dest)
 
 

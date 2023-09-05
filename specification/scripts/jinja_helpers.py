@@ -36,7 +36,7 @@ def _undecorate(name):
 
 
 def _quote_string(s):
-    return '"{}"'.format(s)
+    return f'"{s}"'
 
 
 def _base_name(name):
@@ -48,15 +48,11 @@ def _collapse_whitespace(s):
 
 
 def _protect_begin(entity):
-    if entity.protect_value:
-        return "#if {}".format(entity.protect_string)
-    return ""
+    return f"#if {entity.protect_string}" if entity.protect_value else ""
 
 
 def _protect_end(entity):
-    if entity.protect_value:
-        return "#endif // {}".format(entity.protect_string)
-    return ""
+    return f"#endif // {entity.protect_string}" if entity.protect_value else ""
 
 
 def make_jinja_environment(file_with_templates_as_sibs=None, search_path=None):
@@ -137,8 +133,9 @@ class JinjaTemplate:
         try:
             self.template = env.get_template(fn)
         except TemplateSyntaxError as e:
-            print("Jinja2 template syntax error during parse: {}:{} error: {}".
-                  format(e.filename, e.lineno, e.message))
+            print(
+                f"Jinja2 template syntax error during parse: {e.filename}:{e.lineno} error: {e.message}"
+            )
             raise e
 
     def render(self, *args, **kwargs):
@@ -155,6 +152,6 @@ class JinjaTemplate:
             return self.template.render(*args, **kwargs)
         except TemplateSyntaxError as e:
             print(
-                "Jinja2 template syntax error during render: {}:{} error: {}".
-                format(e.filename, e.lineno, e.message))
+                f"Jinja2 template syntax error during render: {e.filename}:{e.lineno} error: {e.message}"
+            )
             raise e

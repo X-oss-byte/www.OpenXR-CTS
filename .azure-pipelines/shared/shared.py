@@ -12,15 +12,13 @@ TRUE_FALSE = (True, False)
 
 
 def make_win_artifact_name(platform, uwp):
-    return 'loader_{}{}'.format(
-        platform.lower(),
-        '_uwp' if uwp else '',
-    )
+    return f"loader_{platform.lower()}{'_uwp' if uwp else ''}"
 
 
 def output_json(data):
     if len(sys.argv) == 2:
         print(
-            "##vso[task.setVariable variable={};isOutput=true]{}".format(sys.argv[1], json.dumps(data)))
+            f"##vso[task.setVariable variable={sys.argv[1]};isOutput=true]{json.dumps(data)}"
+        )
     else:
         print(json.dumps(data, indent=4))

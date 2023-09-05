@@ -23,7 +23,9 @@ from spec_tools.validity import ValidityCollection, ValidityEntry
 class UnhandledCaseError(NotImplementedError):
     def __init__(self, msg=None):
         if msg:
-            super().__init__('Got a case in the validity generator that we have not explicitly handled: ' + msg)
+            super().__init__(
+                f'Got a case in the validity generator that we have not explicitly handled: {msg}'
+            )
         else:
             super().__init__('Got a case in the validity generator that we have not explicitly handled.')
 
@@ -233,46 +235,44 @@ class ValidityOutputGenerator(OutputGenerator):
         OutputGenerator.beginFile(self, genOpts)
 
     def generateStateValidity(self, validity, command_name):
-        begins_states = self.states.get_states(command_name, StateRelationship.BEGIN)
-        if begins_states:
+        if begins_states := self.states.get_states(
+            command_name, StateRelationship.BEGIN
+        ):
             for state_name in sorted(begins_states):
                 end_commands = self.states.get_commands(state_name, StateRelationship.END)
                 assert(end_commands)
 
                 entry = ValidityEntry(anchor=(state_name, 'beginstate'))
-                entry += 'flink:{} must: not be called more than once without first successfully calling '.format(
-                    command_name)
+                entry += f'flink:{command_name} must: not be called more than once without first successfully calling '
                 entry += self.makeProseList(sorted(end_commands), fmt=plf.OR)
                 validity += entry
 
-        ends_states = self.states.get_states(command_name, StateRelationship.END)
-        if ends_states:
+        if ends_states := self.states.get_states(
+            command_name, StateRelationship.END
+        ):
             for state_name in sorted(ends_states):
                 begin_commands = self.states.get_commands(state_name, StateRelationship.BEGIN)
                 assert(begin_commands)
 
                 entry = ValidityEntry(anchor=(state_name, 'beginstate'))
-                entry += 'flink:{} must: only be called after a successful call to '.format(
-                    command_name)
+                entry += f'flink:{command_name} must: only be called after a successful call to '
                 entry += self.makeProseList(sorted(begin_commands), fmt=plf.OR)
                 validity += entry
 
-        checks_states = self.states.get_states(command_name, StateRelationship.CHECK)
-        if checks_states:
+        if checks_states := self.states.get_states(
+            command_name, StateRelationship.CHECK
+        ):
             for state_name in sorted(checks_states):
                 begin_commands = self.states.get_commands(state_name, StateRelationship.BEGIN)
                 end_commands = self.states.get_commands(state_name, StateRelationship.END)
                 assert(begin_commands)
                 assert(end_commands)
 
-                begin_command_list = '/'.join('flink:{}'.format(command)
-                                              for command in begin_commands)
-                end_command_list = '/'.join('flink:{}'.format(command)
-                                            for command in end_commands)
+                begin_command_list = '/'.join(f'flink:{command}' for command in begin_commands)
+                end_command_list = '/'.join(f'flink:{command}' for command in end_commands)
 
                 entry = ValidityEntry(anchor=(state_name, 'checkstate'))
-                entry += 'flink:{} must: only be called between successful calls to '.format(
-                    command_name)
+                entry += f'flink:{command_name} must: only be called between successful calls to '
                 entry += begin_command_list
                 entry += ' and '
                 entry += end_command_list
@@ -303,19 +303,19 @@ class ValidityOutputGenerator(OutputGenerator):
 
     def makeParameterName(self, name):
         """Prepend the appropriate format macro for a parameter/member to a parameter name."""
-        return 'pname:' + name
+        return f'pname:{name}'
 
     def makeBaseTypeName(self, name):
         """Prepend the appropriate format macro for a 'base type' to a type name."""
-        return 'basetype:' + name
+        return f'basetype:{name}'
 
     def makeEnumerationName(self, name):
         """Prepend the appropriate format macro for an enumeration type to a enum type name."""
-        return 'elink:' + name
+        return f'elink:{name}'
 
     def makeFuncPointerName(self, name):
         """Prepend the appropriate format macro for a function pointer type to a type name."""
-        return 'tlink:' + name
+        return f'tlink:{name}'
 
     def makeExternalTypeName(self, name):
         """Prepend the appropriate format macro for an external type like uint32_t to a type name."""
@@ -324,7 +324,7 @@ class ValidityOutputGenerator(OutputGenerator):
 
     def makeEnumerantName(self, name):
         """Prepend the appropriate format macro for an enumerate (value) to a enum value name."""
-        return 'ename:' + name
+        return f'ename:{name}'
 
     def writeInclude(self, directory, basename, validity: ValidityCollection,
                      threadsafety, commandpropertiesentry=None,
@@ -345,7 +345,7 @@ class ValidityOutputGenerator(OutputGenerator):
         self.makeDir(directory)
 
         # Create validity file
-        filename = directory / (basename + '.txt')
+        filename = directory / f'{basename}.txt'
         self.logMsg('diag', '# Generating include file:', str(filename))
 
         with open(filename, 'w', encoding='utf-8') as fp:
@@ -436,11 +436,9 @@ class ValidityOutputGenerator(OutputGenerator):
     def isHandleTypeDispatchable(self, handlename):
         """Check if a parent object is dispatchable or not."""
         handle = self.registry.tree.find(
-            "types/type/[name='" + handlename + "'][@category='handle']")
-        if handle is not None and getElemType(handle) == 'VK_DEFINE_HANDLE':
-            return True
-        else:
-            return False
+            f"types/type/[name='{handlename}'][@category='handle']"
+        )
+        return handle is not None and getElemType(handle) == 'VK_DEFINE_HANDLE'
 
     def isHandleOptional(self, param, params):
         # Simple, if it is optional, return true
@@ -501,7 +499,8 @@ class ValidityOutputGenerator(OutputGenerator):
 
                 if self.paramIsPointer(other_param):
                     optionallengths.append(
-                        'the value referenced by ' + self.makeParameterName(length.other_param_name))
+                        f'the value referenced by {self.makeParameterName(length.other_param_name)}'
+                    )
                 else:
                     optionallengths.append(
                         self.makeParameterName(length.other_param_name))
@@ -511,7 +510,7 @@ class ValidityOutputGenerator(OutputGenerator):
                 entry += 'If '
             if optionallengths:
                 entry += self.makeProseListIs(optionallengths, fmt=plf.OR)
-                entry += ' not %s, ' % self.conventions.zero
+                entry += f' not {self.conventions.zero}, '
             # TODO enabling this in OpenXR, as used in Vulkan, causes nonsensical things like
             # "If pname:propertyCapacityInput is not `0`, and pname:properties is not `NULL`, pname:properties must: be a pointer to an array of pname:propertyCapacityInput slink:XrApiLayerProperties structures"
             # if optionallengths and is_optional:
@@ -534,13 +533,11 @@ class ValidityOutputGenerator(OutputGenerator):
                     if self.isHandleTypeDispatchable(paramtype):
                         optional_val = self.null
                     else:
-                        optional_val = 'dlink:' + self.conventions.api_prefix + 'NULL_HANDLE'
+                        optional_val = f'dlink:{self.conventions.api_prefix}NULL_HANDLE'
                 else:
                     optional_val = self.conventions.zero
 
-                entry += 'If {} is not {}, '.format(
-                    self.makeParameterName(param_name),
-                    optional_val)
+                entry += f'If {self.makeParameterName(param_name)} is not {optional_val}, '
             return entry
 
         # If none of the early returns happened, we at least return an empty
@@ -580,7 +577,7 @@ class ValidityOutputGenerator(OutputGenerator):
                 entry += 'a '
                 if paramtype == _WCHAR:
                     entry += "wide "
-                entry += 'character array of length %s ' % self.staticArrayLength(param)
+                entry += f'character array of length {self.staticArrayLength(param)} '
             add_see_also(entry)
             validity += entry
             return validity
@@ -600,7 +597,7 @@ class ValidityOutputGenerator(OutputGenerator):
                     pointer_text = self.valid_pointer_text
                 else:
                     array_text = 'arrays'
-                    pointer_text = self.valid_pointer_text + 's'
+                    pointer_text = f'{self.valid_pointer_text}s'
 
                 if length.null_terminated:
                     # This should always be the last thing.
@@ -615,11 +612,7 @@ class ValidityOutputGenerator(OutputGenerator):
                     entry += array_text
                     entry += ' of '
                     # Handle equations, which are currently denoted with latex
-                    if length.math:
-                        # Handle equations, which are currently denoted with latex
-                        entry += str(length)
-                    else:
-                        entry += self.makeParameterName(str(length))
+                    entry += str(length) if length.math else self.makeParameterName(str(length))
                     entry += ' '
 
             # Void pointers do not actually point at anything - remove the word "to"
@@ -639,12 +632,7 @@ class ValidityOutputGenerator(OutputGenerator):
 
             elif paramtype == _CHAR:
                 # A null terminated array of chars is a string
-                if lengths[-1].null_terminated:
-                    entry += 'UTF-8 string'
-                else:
-                    # Else it is just a bunch of chars
-                    entry += 'char value'
-
+                entry += 'UTF-8 string' if lengths[-1].null_terminated else 'char value'
             elif self.paramIsConst(param):
                 # If a value is "const" that means it will not get modified, so it must be valid going into the function.
                 if 'const' in param.text:
@@ -654,9 +642,9 @@ class ValidityOutputGenerator(OutputGenerator):
 
             # Check if the array elements are optional
             array_element_optional = len(optional) == len(lengths) + 1 \
-                and optional[-1]
+                    and optional[-1]
             if array_element_optional and self.getTypeCategory(paramtype) != 'bitmask':  # bitmask is handled later
-                entry += 'or dlink:' + self.conventions.api_prefix + 'NULL_HANDLE '
+                entry += f'or dlink:{self.conventions.api_prefix}NULL_HANDLE '
 
             entry += typetext
 
@@ -681,7 +669,7 @@ class ValidityOutputGenerator(OutputGenerator):
 
             # Could be multi-level pointers (e.g. ppData - pointer to a pointer). Handle that.
             entry += 'a '
-            entry += (self.valid_pointer_text + ' to a ') * pointercount
+            entry += f'{self.valid_pointer_text} to a ' * pointercount
 
             # Handle void* and pointers to it
             if paramtype == 'void':
@@ -725,7 +713,7 @@ class ValidityOutputGenerator(OutputGenerator):
         # TODO does not really handle if someone tries something like optional="true,false"
         optional = parse_optional_from_param(param)
         if self.getTypeCategory(paramtype) != 'bitmask' or \
-                any(optional):
+                    any(optional):
             return entry
         if self.paramIsPointer(param) and not self.paramIsArray(param):
             # This is presumably an output parameter
@@ -739,8 +727,7 @@ class ValidityOutputGenerator(OutputGenerator):
         entry2 = ValidityEntry(anchor=(param_name, 'requiredbitmask'))
         if self.paramIsArray(param):
             entry2 += 'Each element of '
-        entry2 += '{} must: not be {}'.format(
-            self.makeParameterName(param_name), self.conventions.zero)
+        entry2 += f'{self.makeParameterName(param_name)} must: not be {self.conventions.zero}'
         validity += entry2
         return validity
 
@@ -751,11 +738,7 @@ class ValidityOutputGenerator(OutputGenerator):
             return False
         members = info.getMembers()
         type_member = findNamedElem(members, self.structtype_member_name)
-        if type_member is None:
-            return False
-
-        # If we have a type member without specified values, it is a base header.
-        return type_member.get('values') is None
+        return False if type_member is None else type_member.get('values') is None
 
     def createValidationLineForParameter(self, blockname, param, params, typecategory):
         """Make an entire validation entry for a given parameter."""
@@ -777,7 +760,7 @@ class ValidityOutputGenerator(OutputGenerator):
 
         elif typecategory == 'bitmask':
             bitsname = paramtype.replace('Flags', 'FlagBits')
-            bitselem = self.registry.tree.find("enums[@name='" + bitsname + "']")
+            bitselem = self.registry.tree.find(f"enums[@name='{bitsname}']")
             if bitselem is None or len(bitselem.findall('enum')) == 0:
                 # Empty bit mask: presumably just a placeholder (or only in
                 # an extension not enabled for this build)
@@ -792,66 +775,54 @@ class ValidityOutputGenerator(OutputGenerator):
 
             is_const = self.paramIsConst(param)
 
-            if is_array:
-                if is_const:
-                    # input an array of bitmask values
-                    template = 'combinations of {bitsname} value'
-                else:
-                    template = '{paramtype} value'
-            elif is_pointer:
-                if is_const:
-                    template = 'combination of {bitsname} values'
-                else:
-                    template = '{paramtype} value'
+            if is_array and is_const:
+                # input an array of bitmask values
+                template = 'combinations of {bitsname} value'
+            elif is_array or is_pointer and not is_const:
+                template = '{paramtype} value'
             else:
                 template = 'combination of {bitsname} values'
-
             # The above few cases all use makeEnumerationName, just with different context.
             typetext = template.format(
                 bitsname=self.makeEnumerationName(bitsname),
                 paramtype=self.makeEnumerationName(paramtype))
 
         elif typecategory == 'handle':
-            typetext = '{} handle'.format(self.makeStructName(paramtype))
+            typetext = f'{self.makeStructName(paramtype)} handle'
 
         elif typecategory == 'enum':
-            typetext = '{} value'.format(self.makeEnumerationName(paramtype))
+            typetext = f'{self.makeEnumerationName(paramtype)} value'
 
         elif typecategory == 'funcpointer':
-            typetext = '{} value'.format(self.makeFuncPointerName(paramtype))
+            typetext = f'{self.makeFuncPointerName(paramtype)} value'
 
         elif typecategory == 'struct':
             if needs_recursive_validity:
                 if self.isBaseHeaderType(paramtype):
-                    typetext = '{}-based structure'.format(
-                        self.makeStructName(paramtype))
-                    child_structs = self.keepOnlyRequired(self.struct_children.get(paramtype, []),
-                                                          self.registry.typedict)
-                    if child_structs:
-                        see_also = 'See also: {}'.format(', '.join(self.makeStructName(t) for t in sorted(child_structs)))
+                    typetext = f'{self.makeStructName(paramtype)}-based structure'
+                    if child_structs := self.keepOnlyRequired(
+                        self.struct_children.get(paramtype, []),
+                        self.registry.typedict,
+                    ):
+                        see_also = f"See also: {', '.join(self.makeStructName(t) for t in sorted(child_structs))}"
                 else:
-                    typetext = '{} structure'.format(
-                        self.makeStructName(paramtype))
+                    typetext = f'{self.makeStructName(paramtype)} structure'
 
         elif typecategory == 'union':
             if needs_recursive_validity:
-                typetext = '{} union'.format(self.makeStructName(paramtype))
+                typetext = f'{self.makeStructName(paramtype)} union'
 
         elif self.paramIsArray(param) or self.paramIsPointer(param):
             if typecategory == 'basetype':
-                typetext = '{} value'.format(self.makeBaseTypeName(paramtype))
+                typetext = f'{self.makeBaseTypeName(paramtype)} value'
             elif typecategory is None:
-                typetext = '{} value'.format(self.makeExternalTypeName(paramtype))
+                typetext = f'{self.makeExternalTypeName(paramtype)} value'
             else:
                 raise UnhandledCaseError()
 
         elif typecategory is None:
             if not self.isStructAlwaysValid(paramtype):
-                typetext = '{} value'.format(
-                    self.makeExternalTypeName(paramtype))
-
-            # "a valid uint32_t value" does not make much sense.
-            pass
+                typetext = f'{self.makeExternalTypeName(paramtype)} value'
 
         # If any of the above conditions matched and set typetext,
         # we call using it.
@@ -894,8 +865,7 @@ class ValidityOutputGenerator(OutputGenerator):
 
         entry += template.format(self.makeParameterName(param_name))
 
-        entry += ' must: have been created, allocated, or retrieved from {}'.format(
-            self.makeParameterName(parent_name))
+        entry += f' must: have been created, allocated, or retrieved from {self.makeParameterName(parent_name)}'
 
         return entry
 
@@ -912,12 +882,15 @@ class ValidityOutputGenerator(OutputGenerator):
         }
 
         # all handle types supplied to this function
-        handle_types = set(getElemType(h) for h in input_handles)
+        handle_types = {getElemType(h) for h in input_handles}
 
         # Only consider the handles without any ancestors also being
         # supplied to this function.
-        top_level_handles = set(h for h in input_handles
-                                if _genericIsDisjoint(ancestor_map[h], handle_types))
+        top_level_handles = {
+            h
+            for h in input_handles
+            if _genericIsDisjoint(ancestor_map[h], handle_types)
+        }
 
         # Remove all non-top-level-handles from further consideration
         for removal in set(ancestor_map.keys()).difference(top_level_handles):
@@ -933,10 +906,7 @@ class ValidityOutputGenerator(OutputGenerator):
         common_ancestors = reduce(_orderedDictIntersection,
                                   ancestor_map.values())
 
-        # The first common ancestor should be the nearest one.
-        # We already ensured we have at least one.
-        common_ancestor = next(iter(common_ancestors), None)
-        return common_ancestor
+        return next(iter(common_ancestors), None)
 
     def makeHandlesValidityCommonAncestor(self, handles, params):
         """Make an validity entry for a common ancestor between handles, not explicitly passed as a param.
@@ -1021,11 +991,13 @@ class ValidityOutputGenerator(OutputGenerator):
         if values:
             values = self.findRequiredEnums(values.split(','))
 
-        child_structs = self.keepOnlyRequired(self.struct_children.get(structname, []),
-                                              self.registry.typedict)
-        if child_structs:
+        if child_structs := self.keepOnlyRequired(
+            self.struct_children.get(structname, []), self.registry.typedict
+        ):
             if values:
-                print('The struct: {} has children, it may not have a "values" attribute itself.'.format(structname))
+                print(
+                    f'The struct: {structname} has children, it may not have a "values" attribute itself.'
+                )
             assert(not values)
             if len(child_structs) > 1:
                 entry += 'one of the following XrStructureType values: '
@@ -1081,13 +1053,12 @@ class ValidityOutputGenerator(OutputGenerator):
                     self.logMsg('warn', 'makeStructureExtensionPointer: struct', struct,
                                 'is in a validextensionstructs= attribute but is not in the registry')
                 elif t.required:
-                    extensionstructs.append('slink:' + struct)
+                    extensionstructs.append(f'slink:{struct}')
                 else:
                     self.logMsg(
                         'diag', 'makeStructureExtensionPointer: struct', struct, 'IS NOT required')
 
-        entry += '{} must: be {} or a valid pointer to the <<valid-usage-for-structure-pointer-chains, next structure in a structure chain>>'.format(
-            self.makeParameterName(param_name), self.null)
+        entry += f'{self.makeParameterName(param_name)} must: be {self.null} or a valid pointer to the <<valid-usage-for-structure-pointer-chains, next structure in a structure chain>>'
         if not extensionstructs:
             return entry
         entry += '. See also: '
@@ -1135,7 +1106,7 @@ class ValidityOutputGenerator(OutputGenerator):
         """Generate all the valid usage information for a given struct or command."""
         validity = self.makeValidityCollection(blockname)
         handles = []
-        arraylengths = dict()
+        arraylengths = {}
         for param in params:
             param_name = getElemName(param)
             paramtype = getElemType(param)
@@ -1157,12 +1128,12 @@ class ValidityOutputGenerator(OutputGenerator):
             if typecategory == 'handle':
                 handles.append(param)
 
-            # Get the array length for this parameter
-            lengths = LengthEntry.parse_len_from_param(param)
-            if lengths:
-                arraylengths.update({length.other_param_name: length
-                                     for length in lengths
-                                     if length.other_param_name})
+            if lengths := LengthEntry.parse_len_from_param(param):
+                arraylengths |= {
+                    length.other_param_name: length
+                    for length in lengths
+                    if length.other_param_name
+                }
 
         # Any non-optional arraylengths should specify they must be greater than 0
         array_length_params = ((param, getElemName(param))
@@ -1180,13 +1151,12 @@ class ValidityOutputGenerator(OutputGenerator):
             simple_param_reference = (len(length.param_ref_parts) == 1)
 
             # Get all the array dependencies
-            arrays = cmd.findall(
-                "param/[@len='{}'][@optional='true']".format(full_length))
+            arrays = cmd.findall(f"param/[@len='{full_length}'][@optional='true']")
 
             # Get all the optional array dependencies, including those not generating validity for some reason
-            optionalarrays = arrays + \
-                cmd.findall(
-                    "param/[@len='{}'][@noautovalidity='true']".format(full_length))
+            optionalarrays = arrays + cmd.findall(
+                f"param/[@len='{full_length}'][@noautovalidity='true']"
+            )
 
             entry = ValidityEntry(anchor=(full_length, 'arraylength'))
             # Allow lengths to be arbitrary if all their dependents are optional
@@ -1197,7 +1167,7 @@ class ValidityOutputGenerator(OutputGenerator):
                 entry += self.makeProseListIs(optional_array_names,
                                               fmt=plf.ANY_OR)
 
-                entry += ' not {}, '.format(self.null)
+                entry += f' not {self.null}, '
 
             if self.paramIsPointer(param):
                 entry += 'the value referenced by '
@@ -1228,7 +1198,7 @@ class ValidityOutputGenerator(OutputGenerator):
         extsync_prefix = "{externsyncprefix} "
 
         # Find and add any parameters that are thread unsafe
-        explicitexternsyncparams = cmd.findall(paramtext + "[@externsync]")
+        explicitexternsyncparams = cmd.findall(f"{paramtext}[@externsync]")
         if explicitexternsyncparams is not None:
             for param in explicitexternsyncparams:
                 externsyncattribs = ExternSyncEntry.parse_externsync_from_param(param)
@@ -1315,10 +1285,8 @@ class ValidityOutputGenerator(OutputGenerator):
         return_lines = []
         RETURN_CODE_FORMAT = '* ename:{}'
 
-        codes_attr = cmd.get(attrib)
-        if codes_attr:
-            codes = self.findRequiredEnums(codes_attr.split(','))
-            if codes:
+        if codes_attr := cmd.get(attrib):
+            if codes := self.findRequiredEnums(codes_attr.split(',')):
                 return_lines.extend((RETURN_CODE_FORMAT.format(code)
                                      for code in codes))
 
@@ -1328,14 +1296,10 @@ class ValidityOutputGenerator(OutputGenerator):
         for ext_code in applicable_ext_codes:
             line = RETURN_CODE_FORMAT.format(ext_code.value)
             if ext_code.extension:
-                line += ' [only if {} is enabled]'.format(
-                    self.conventions.formatExtension(ext_code.extension))
+                line += f' [only if {self.conventions.formatExtension(ext_code.extension)} is enabled]'
 
             return_lines.append(line)
-        if return_lines:
-            return '\n'.join(return_lines)
-
-        return None
+        return '\n'.join(return_lines) if return_lines else None
 
     def makeSuccessCodes(self, cmd, name):
         return self.makeReturnCodeList('successcodes', cmd, name)

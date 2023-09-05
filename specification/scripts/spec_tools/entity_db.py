@@ -113,7 +113,7 @@ class EntityDatabase(ABC):
         """Return a set of "support=" attribute strings that should not be included in the database.
 
         Called only during construction."""
-        return set(('disabled',))
+        return {'disabled'}
 
     ###
     # Methods that it is optional to **extend**
@@ -135,13 +135,11 @@ class EntityDatabase(ABC):
             self.addEntity(name, 'code', elem=info.elem, generates=False)
             return
 
-        protect = info.elem.get('protect')
-        if protect:
+        if protect := info.elem.get('protect'):
             self.addEntity(protect, 'dlink',
                            category='configdefines', generates=False)
 
-        alias = info.elem.get('alias')
-        if alias:
+        if alias := info.elem.get('alias'):
             self.addAlias(name, alias)
 
         cat = info.elem.get('category')
@@ -182,7 +180,7 @@ class EntityDatabase(ABC):
             self.addEntity(name, 'code', elem=info.elem, generates=False)
 
         else:
-            raise RuntimeError('unrecognized category {}'.format(cat))
+            raise RuntimeError(f'unrecognized category {cat}')
 
     def handleCommand(self, name, info):
         """Add entities, if appropriate, for an item in registry.cmddict.
@@ -207,8 +205,7 @@ class EntityDatabase(ABC):
 
         self.addEntity(name, None, category=EXTENSION_CATEGORY,
                        generates=False)
-        protect = info.elem.get('protect')
-        if protect:
+        if protect := info.elem.get('protect'):
             self.addEntity(protect, 'dlink',
                            category='configdefines', generates=False)
 
@@ -239,12 +236,10 @@ class EntityDatabase(ABC):
 
         If it fails, it will try resolving aliases.
         """
-        result = self._byEntity.get(entity)
-        if result:
+        if result := self._byEntity.get(entity):
             return result
 
-        alias_set = self._aliasSetsByEntity.get(entity)
-        if alias_set:
+        if alias_set := self._aliasSetsByEntity.get(entity):
             for alias in alias_set:
                 if alias in self._byEntity:
                     return self.findEntity(alias)
@@ -270,11 +265,8 @@ class EntityDatabase(ABC):
             return None
         if data.elem is None:
             return None
-        if data.macro == 'slink':
-            tag = 'member'
-        else:
-            tag = 'param'
-        return data.elem.findall('.//{}'.format(tag))
+        tag = 'member' if data.macro == 'slink' else 'param'
+        return data.elem.findall(f'.//{tag}')
 
     def getMemberNames(self, commandOrStruct):
         """Given a command or struct name, retrieve the names of each member/param.
@@ -286,8 +278,7 @@ class EntityDatabase(ABC):
             return []
         ret = []
         for member in members:
-            name_tag = member.find('name')
-            if name_tag:
+            if name_tag := member.find('name'):
                 ret.append(name_tag.text)
         return ret
 
@@ -413,10 +404,12 @@ class EntityDatabase(ABC):
 
     def childTypes(self, typename):
         """Return the list of types specifying typename as their parent type."""
-        children = [childname
-                    for childname, entity in self._byEntity.items()
-                    if entity.elem is not None and entity.elem.get("parentstruct") == typename]
-        return children
+        return [
+            childname
+            for childname, entity in self._byEntity.items()
+            if entity.elem is not None
+            and entity.elem.get("parentstruct") == typename
+        ]
 
     ###
     # Methods only used during initial setup/population of this data structure
@@ -495,8 +488,7 @@ class EntityDatabase(ABC):
         """
         # Probably dealt with in handleType(), but just in case it wasn't.
         if elem is not None:
-            alias = elem.get('alias')
-            if alias:
+            if alias := elem.get('alias'):
                 self.addAlias(entityName, alias)
 
         if entityName in self._byEntity:
@@ -518,7 +510,7 @@ class EntityDatabase(ABC):
 
         # Don't generate a filename if this entity doesn't generate includes.
         if filename is None and generates:
-            filename = '{}/{}.txt'.format(directory, entityName)
+            filename = f'{directory}/{entityName}.txt'
 
         data = EntityData(
             entity=entityName,
@@ -578,7 +570,8 @@ class EntityDatabase(ABC):
         ) + self.name_prefix[1:]
         # Regex string for the name prefix that is case-insensitive.
         self.case_insensitive_name_prefix_pattern = ''.join(
-            ('[{}{}]'.format(c.upper(), c) for c in self.name_prefix))
+            f'[{c.upper()}{c}]' for c in self.name_prefix
+        )
 
         self.platform_requires = self.getPlatformRequires()
 

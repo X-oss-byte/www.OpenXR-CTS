@@ -12,6 +12,7 @@
     :copyright: (c) 2017 by the Jinja Team.
     :license: BSD.
 """
+
 import types
 import operator
 from jinja2.environment import Environment
@@ -28,8 +29,13 @@ MAX_RANGE = 100000
 
 #: attributes of function objects that are considered unsafe.
 if PY2:
-    UNSAFE_FUNCTION_ATTRIBUTES = set(['func_closure', 'func_code', 'func_dict',
-                                      'func_defaults', 'func_globals'])
+    UNSAFE_FUNCTION_ATTRIBUTES = {
+        'func_closure',
+        'func_code',
+        'func_dict',
+        'func_defaults',
+        'func_globals',
+    }
 else:
     # On versions > python 2 the special attributes on functions are gone,
     # but they remain on methods and generators for whatever reason.
@@ -37,16 +43,16 @@ else:
 
 
 #: unsafe method attributes.  function attributes are unsafe for methods too
-UNSAFE_METHOD_ATTRIBUTES = set(['im_class', 'im_func', 'im_self'])
+UNSAFE_METHOD_ATTRIBUTES = {'im_class', 'im_func', 'im_self'}
 
 #: unsafe generator attirbutes.
-UNSAFE_GENERATOR_ATTRIBUTES = set(['gi_frame', 'gi_code'])
+UNSAFE_GENERATOR_ATTRIBUTES = {'gi_frame', 'gi_code'}
 
 #: unsafe attributes on coroutines
-UNSAFE_COROUTINE_ATTRIBUTES = set(['cr_frame', 'cr_code'])
+UNSAFE_COROUTINE_ATTRIBUTES = {'cr_frame', 'cr_code'}
 
 #: unsafe attributes on async generators
-UNSAFE_ASYNC_GENERATOR_ATTRIBUTES = set(['ag_code', 'ag_frame'])
+UNSAFE_ASYNC_GENERATOR_ATTRIBUTES = {'ag_code', 'ag_frame'}
 
 import warnings
 
@@ -228,10 +234,14 @@ def modifies_known_mutable(obj, attr):
     >>> modifies_known_mutable("foo", "upper")
     False
     """
-    for typespec, unsafe in _mutable_spec:
-        if isinstance(obj, typespec):
-            return attr in unsafe
-    return False
+    return next(
+        (
+            attr in unsafe
+            for typespec, unsafe in _mutable_spec
+            if isinstance(obj, typespec)
+        ),
+        False,
+    )
 
 
 class SandboxedEnvironment(Environment):
@@ -469,10 +479,7 @@ class SandboxedFormatterMixin(object):
         first, rest = formatter_field_name_split(field_name)
         obj = self.get_value(first, args, kwargs)
         for is_attr, i in rest:
-            if is_attr:
-                obj = self._env.getattr(obj, i)
-            else:
-                obj = self._env.getitem(obj, i)
+            obj = self._env.getattr(obj, i) if is_attr else self._env.getitem(obj, i)
         return obj, first
 
 class SandboxedFormatter(SandboxedFormatterMixin, Formatter):

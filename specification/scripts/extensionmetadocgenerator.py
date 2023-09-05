@@ -78,14 +78,20 @@ class Extension:
             supercededBy = obsoletedBy
 
         if supercededBy is not None:
-            if supercededBy == '' and not self.deprecationType == 'promotion':
+            if supercededBy == '' and self.deprecationType != 'promotion':
                 pass # supercedingAPIVersion, supercedingExtension is None
             elif supercededBy.startswith(self.conventions.api_version_prefix):
                 self.supercedingAPIVersion = supercededBy
             elif supercededBy.startswith(self.conventions.api_prefix):
                 self.supercedingExtension = supercededBy
             else:
-                self.generator.logMsg('error', 'Unrecognized ' + self.deprecationType + ' attribute value \'' + supercededBy + '\'!')
+                self.generator.logMsg(
+                    'error',
+                    f'Unrecognized {self.deprecationType}'
+                    + ' attribute value \''
+                    + supercededBy
+                    + '\'!',
+                )
 
     def __str__(self):
         return self.name
@@ -107,10 +113,7 @@ class Extension:
             return swap
         if self_is_EXT and not other_is_EXT:
             return not swap
-        if other_is_EXT and not self_is_EXT:
-            return swap
-
-        return self.name < other.name
+        return swap if other_is_EXT and not self_is_EXT else self.name < other.name
 
     def typeToStr(self):
         if self.ext_type == 'instance':
@@ -119,7 +122,11 @@ class Extension:
             return 'Device extension'
 
         if self.ext_type is not None:
-            self.generator.logMsg('warn', 'The type attribute of ' + self.name + ' extension is neither \'instance\' nor \'device\'. That is invalid (at the time this script was written).')
+            self.generator.logMsg(
+                'warn',
+                f'The type attribute of {self.name}'
+                + ' extension is neither \'instance\' nor \'device\'. That is invalid (at the time this script was written).',
+            )
         else: # should be unreachable
             self.generator.logMsg('error', 'Logic error in typeToStr(): Missing type attribute!')
         return None
@@ -136,36 +143,36 @@ class Extension:
         if isRefpage:
             # Always link into API spec
             specURL = self.conventions.specURL('api')
-            return 'link:{}#{}[{}^]'.format(specURL, xrefName, xrefText)
+            return f'link:{specURL}#{xrefName}[{xrefText}^]'
         else:
-            return '<<' + xrefName + ', ' + xrefText + '>>'
+            return f'<<{xrefName}, {xrefText}>>'
 
     def conditionalLinkCoreAPI(self, apiVersion, linkSuffix, isRefpage):
         versionMatch = re.match(self.conventions.api_version_prefix + r'(\d+)_(\d+)', apiVersion)
         major = versionMatch.group(1)
         minor = versionMatch.group(2)
 
-        dottedVersion = major + '.' + minor
+        dottedVersion = f'{major}.{minor}'
 
-        xrefName = 'versions-' + dottedVersion + linkSuffix
-        xrefText = self.conventions.api_name() + ' ' + dottedVersion
+        xrefName = f'versions-{dottedVersion}{linkSuffix}'
+        xrefText = f'{self.conventions.api_name()} {dottedVersion}'
 
-        doc  = 'ifdef::' + apiVersion + '[]\n'
-        doc += '    ' + self.specLink(xrefName, xrefText, isRefpage) + '\n'
-        doc += 'endif::' + apiVersion + '[]\n'
-        doc += 'ifndef::' + apiVersion + '[]\n'
-        doc += '    ' + self.conventions.api_name() + ' ' + dottedVersion + '\n'
-        doc += 'endif::' + apiVersion + '[]\n'
+        doc = f'ifdef::{apiVersion}' + '[]\n'
+        doc += f'    {self.specLink(xrefName, xrefText, isRefpage)}' + '\n'
+        doc += f'endif::{apiVersion}' + '[]\n'
+        doc += f'ifndef::{apiVersion}' + '[]\n'
+        doc += f'    {self.conventions.api_name()} {dottedVersion}' + '\n'
+        doc += f'endif::{apiVersion}' + '[]\n'
 
         return doc
 
     def conditionalLinkExt(self, extName, indent = '    '):
-        doc  = 'ifdef::' + extName + '[]\n'
+        doc = f'ifdef::{extName}' + '[]\n'
         doc +=  indent + self.conventions.formatExtension(extName) + '\n'
-        doc += 'endif::' + extName + '[]\n'
-        doc += 'ifndef::' + extName + '[]\n'
-        doc += indent + '`' + extName + '`\n'
-        doc += 'endif::' + extName + '[]\n'
+        doc += f'endif::{extName}' + '[]\n'
+        doc += f'ifndef::{extName}' + '[]\n'
+        doc += f'{indent}`{extName}' + '`\n'
+        doc += f'endif::{extName}' + '[]\n'
 
         return doc
 

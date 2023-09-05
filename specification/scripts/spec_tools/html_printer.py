@@ -193,11 +193,12 @@ class HTMLPrinter(BasePrinter):
         """Output a Message."""
         anchor = self.getUniqueAnchor()
 
-        self.recordUsage(msg.context,
-                         linkBackTarget=anchor,
-                         linkBackTooltip='{}: {} [...]'.format(
-                             msg.message_type, msg.message[0]),
-                         linkBackType=msg.message_type)
+        self.recordUsage(
+            msg.context,
+            linkBackTarget=anchor,
+            linkBackTooltip=f'{msg.message_type}: {msg.message[0]} [...]',
+            linkBackType=msg.message_type,
+        )
 
         self.f.write("""
         <div class="card">
@@ -222,14 +223,15 @@ class HTMLPrinter(BasePrinter):
             self.f.write('<p>See also:</p><ul>\n')
             for see in msg.see_also:
                 if isinstance(see, MessageContext):
-                    self.f.write(
-                        '<li>{}</li>\n'.format(self.formatContext(see)))
-                    self.recordUsage(see,
-                                     linkBackTarget=anchor,
-                                     linkBackType=MessageType.NOTE,
-                                     linkBackTooltip='see-also associated with {} at {}'.format(msg.message_type, self.formatContextBrief(see)))
+                    self.f.write(f'<li>{self.formatContext(see)}</li>\n')
+                    self.recordUsage(
+                        see,
+                        linkBackTarget=anchor,
+                        linkBackType=MessageType.NOTE,
+                        linkBackTooltip=f'see-also associated with {msg.message_type} at {self.formatContextBrief(see)}',
+                    )
                 else:
-                    self.f.write('<li>{}</li>\n'.format(self.formatBrief(see)))
+                    self.f.write(f'<li>{self.formatBrief(see)}</li>\n')
             self.f.write('</ul>')
         if msg.replacement is not None:
             self.f.write(
@@ -239,16 +241,18 @@ class HTMLPrinter(BasePrinter):
                 '<div class="alert alert-info">Note: Auto-fix available.</div>')
         if msg.script_location:
             self.f.write(
-                '<p>Message originated at <code>{}</code></p>'.format(msg.script_location))
-        self.f.write('<pre class="line-numbers language-asciidoc" data-start="{}"><code>'.format(
-            msg.context.lineNum))
+                f'<p>Message originated at <code>{msg.script_location}</code></p>'
+            )
+        self.f.write(
+            f'<pre class="line-numbers language-asciidoc" data-start="{msg.context.lineNum}"><code>'
+        )
         highlightStart, highlightEnd = getHighlightedRange(msg.context)
         self.f.write(html.escape(msg.context.line[:highlightStart]))
         self.f.write(
-            '<span class="border border-{}"'.format(MESSAGE_TYPE_STYLES[msg.message_type]))
+            f'<span class="border border-{MESSAGE_TYPE_STYLES[msg.message_type]}"'
+        )
         if msg.replacement is not None:
-            self.f.write(
-                ' data-toggle="tooltip" title="{}"'.format(msg.replacement))
+            self.f.write(f' data-toggle="tooltip" title="{msg.replacement}"')
         self.f.write('>')
         self.f.write(html.escape(
             msg.context.line[highlightStart:highlightEnd]))
@@ -275,7 +279,7 @@ class HTMLPrinter(BasePrinter):
         for entity_name, uses in sorted(broken.items()):
             category = checker.findEntity(entity_name).category
             anchor = self.getUniqueAnchor()
-            asciidocAnchor = '[[{}]]'.format(entity_name)
+            asciidocAnchor = f'[[{entity_name}]]'
             include = generateInclude(dir_traverse='../../generated/',
                                       generated_type='api',
                                       category=category,
@@ -288,13 +292,14 @@ class HTMLPrinter(BasePrinter):
             """.format(anchor, include, asciidocAnchor))
             for context in uses:
                 self.f.write(
-                    '<li class="list-inline-item">{}</li>'.format(self.formatContext(context, MessageType.NOTE)))
+                    f'<li class="list-inline-item">{self.formatContext(context, MessageType.NOTE)}</li>'
+                )
                 self.recordUsage(
                     context,
-                    linkBackTooltip='Link broken in spec: {} not seen'.format(
-                        include),
+                    linkBackTooltip=f'Link broken in spec: {include} not seen',
                     linkBackTarget=anchor,
-                    linkBackType=MessageType.NOTE)
+                    linkBackType=MessageType.NOTE,
+                )
             self.f.write("""</ul></td></tr>""")
         self.f.write("""</table></div>""")
 
@@ -317,7 +322,7 @@ class HTMLPrinter(BasePrinter):
 
         for entity in sorted(missing):
             fn = checker.findEntity(entity).filename
-            anchor = '[[{}]]'.format(entity)
+            anchor = f'[[{entity}]]'
             self.f.write("""
             <tr>
             <td><code class="text-dark">{filename}</code></td>
@@ -378,10 +383,7 @@ class HTMLPrinter(BasePrinter):
     # Format method: return a string.
     def formatContext(self, context, message_type=None):
         """Format a message context in a verbose way."""
-        if message_type is None:
-            icon = LINK_ICON
-        else:
-            icon = MESSAGE_TYPE_ICONS[message_type]
+        icon = LINK_ICON if message_type is None else MESSAGE_TYPE_ICONS[message_type]
         return 'In context: <a href="{href}">{icon}{relative}:{lineNum}:{col}</a>'.format(
             href=self.getAnchorLinkForContext(context),
             icon=icon,
@@ -426,11 +428,10 @@ class HTMLPrinter(BasePrinter):
 
     def getAnchorLinkForContext(self, context):
         """Compute the anchor link to the excerpt for a MessageContext."""
-        return '#excerpt-{}.{}'.format(
-            self.makeIdentifierFromFilename(context.filename), context.lineNum)
+        return f'#excerpt-{self.makeIdentifierFromFilename(context.filename)}.{context.lineNum}'
 
     def getUniqueAnchor(self):
         """Create and return a new unique string usable as a link anchor."""
-        anchor = 'anchor-{}'.format(self.nextAnchor)
+        anchor = f'anchor-{self.nextAnchor}'
         self.nextAnchor += 1
         return anchor

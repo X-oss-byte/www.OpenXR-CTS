@@ -53,17 +53,10 @@ class DiGraph:
         the start node itself. Each node in the graph is yielded at most once.
         """
 
-        # Implementation detail: Do a breadth-first traversal because it is
-        # easier than depth-first.
-
-        # All nodes seen during traversal.
-        seen = set()
-
         # The stack of nodes that need visiting.
         visit_me = []
 
-        # Bootstrap the traversal.
-        seen.add(node)
+        seen = {node}
         for x in self.__nodes[node].adj:
             if x not in seen:
                 seen.add(x)
@@ -124,15 +117,11 @@ class ApiDependencies:
                 if 'KHR' in name:
                     self.khrExts.add(name)
 
-                deps = elem.get('requires')
-                if deps:
+                if deps := elem.get('requires'):
                     for dep in deps.split(','):
                         self.graph.add_edge(name, dep)
                 else:
                     self.graph.add_node(name)
-            else:
-                # Skip unsupported extensions
-                pass
 
     def allExtensions(self):
         """Returns a set of all extensions in the graph"""
@@ -156,9 +145,12 @@ class ApiDependencies:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-registry', action='store',
-                        default=APIConventions().registry_path,
-                        help='Use specified registry file instead of ' + APIConventions().registry_path)
+    parser.add_argument(
+        '-registry',
+        action='store',
+        default=APIConventions().registry_path,
+        help=f'Use specified registry file instead of {APIConventions().registry_path}',
+    )
     parser.add_argument('-loops', action='store',
                         default=20, type=int,
                         help='Number of timing loops to run')
@@ -171,10 +163,10 @@ if __name__ == '__main__':
     import time
     startTime = time.process_time()
 
-    for loop in range(args.loops):
+    for _ in range(args.loops):
         deps = ApiDependencies(args.registry)
 
     endTime = time.process_time()
 
     deltaT = endTime - startTime
-    print('Total time = {} time/loop = {}'.format(deltaT, deltaT / args.loops))
+    print(f'Total time = {deltaT} time/loop = {deltaT / args.loops}')

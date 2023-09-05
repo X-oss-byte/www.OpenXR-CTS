@@ -68,20 +68,19 @@ def matchAPIProfile(api, profile, elem):
     not just strings, so that `api="^(gl|gles2)"` will match. Even
     this is not really quite enough, we might prefer something
     like `"gl(core)|gles1(common-lite)"`."""
-    # Match 'api', if present
-    elem_api = elem.get('api')
-    if elem_api:
+    if elem_api := elem.get('api'):
         if api is None:
-            raise UserWarning("No API requested, but 'api' attribute is present with value '"
-                              + elem_api + "'")
+            raise UserWarning(
+                f"No API requested, but 'api' attribute is present with value '{elem_api}'"
+            )
         elif api != elem_api:
             # Requested API does not match attribute
             return False
-    elem_profile = elem.get('profile')
-    if elem_profile:
+    if elem_profile := elem.get('profile'):
         if profile is None:
-            raise UserWarning("No profile requested, but 'profile' attribute is present with value '"
-                              + elem_profile + "'")
+            raise UserWarning(
+                f"No profile requested, but 'profile' attribute is present with value '{elem_profile}'"
+            )
         elif profile != elem_profile:
             # Requested profile does not match attribute
             return False
@@ -155,29 +154,28 @@ class BaseInfo:
         infoName - 'type' / 'group' / 'enum' / 'command' / 'feature' /
                    'extension'"""
 
-        if infoName == 'enum':
-            if self.compareKeys(info, 'extends'):
-                # Either both extend the same type, or no type
-                if (self.compareKeys(info, 'value', required = True) or
-                    self.compareKeys(info, 'bitpos', required = True)):
-                    # If both specify the same value or bit position,
-                    # they are equal
-                    return True
-                elif (self.compareKeys(info, 'extnumber') and
-                      self.compareKeys(info, 'offset') and
-                      self.compareKeys(info, 'dir')):
-                    # If both specify the same relative offset, they are equal
-                    return True
-                elif (self.compareKeys(info, 'alias')):
-                    # If both are aliases of the same value
-                    return True
-                else:
-                    return False
+        if infoName != 'enum':
+            # Non-<enum>s should never be redefined
+            return False
+        if self.compareKeys(info, 'extends'):
+            # Either both extend the same type, or no type
+            if (self.compareKeys(info, 'value', required = True) or
+                self.compareKeys(info, 'bitpos', required = True)):
+                # If both specify the same value or bit position,
+                # they are equal
+                return True
+            elif (self.compareKeys(info, 'extnumber') and
+                  self.compareKeys(info, 'offset') and
+                  self.compareKeys(info, 'dir')):
+                # If both specify the same relative offset, they are equal
+                return True
+            elif (self.compareKeys(info, 'alias')):
+                # If both are aliases of the same value
+                return True
             else:
-                # The same enum cannot extend two different types
                 return False
         else:
-            # Non-<enum>s should never be redefined
+            # The same enum cannot extend two different types
             return False
 
 
@@ -304,11 +302,7 @@ class Registry:
     """Object representing an API registry, loaded from an XML file."""
 
     def __init__(self, gen=None, genOpts=None):
-        if gen is None:
-            # If not specified, give a default object so messaging will work
-            self.gen = OutputGenerator()
-        else:
-            self.gen = gen
+        self.gen = OutputGenerator() if gen is None else gen
         "Output generator used to write headers / messages"
 
         if genOpts is None:
@@ -431,11 +425,7 @@ class Registry:
         if key in dictionary:
             # self.gen.logMsg('diag', 'Found API-specific element for feature', fname)
             return dictionary[key]
-        if fname in dictionary:
-            # self.gen.logMsg('diag', 'Found generic element for feature', fname)
-            return dictionary[fname]
-
-        return None
+        return dictionary[fname] if fname in dictionary else None
 
     def breakOnName(self, regexp):
         """Specify a feature name regexp to break on when generating features."""
@@ -524,8 +514,7 @@ class Registry:
                 name = cmd.set('name', name_elem.text)
             ci = CmdInfo(cmd)
             self.addElementInfo(cmd, ci, 'command', self.cmddict)
-            alias = cmd.get('alias')
-            if alias:
+            if alias := cmd.get('alias'):
                 cmdAlias.append([name, alias, cmd])
 
         # Now loop over aliases, injecting a copy of the aliased command's
@@ -551,7 +540,7 @@ class Registry:
         # Create dictionaries of API and extension interfaces
         #   from toplevel <api> and <extension> tags.
         self.apidict = {}
-        format_condition = dict()
+        format_condition = {}
         for feature in self.reg.findall('feature'):
             featureInfo = FeatureInfo(feature)
             self.addElementInfo(feature, featureInfo, 'feature', self.apidict)
@@ -646,7 +635,7 @@ class Registry:
                             if enum.get('alias'):
                                 format_name = enum.get('alias')
                             if format_name in format_condition:
-                                format_condition[format_name] += "," + featureInfo.name
+                                format_condition[format_name] += f",{featureInfo.name}"
                             else:
                                 format_condition[format_name] = featureInfo.name
                         addEnumInfo = True
@@ -662,8 +651,10 @@ class Registry:
         # based on "structextends" tags in child structures
         disabled_types = []
         for disabled_ext in self.reg.findall('extensions/extension[@supported="disabled"]'):
-            for type_elem in disabled_ext.findall("*/type"):
-                disabled_types.append(type_elem.get('name'))
+            disabled_types.extend(
+                type_elem.get('name')
+                for type_elem in disabled_ext.findall("*/type")
+            )
         for type_elem in self.reg.findall('types/type'):
             if type_elem.get('name') not in disabled_types:
                 # The structure type this may be chained to.
@@ -704,38 +695,87 @@ class Registry:
         write('// Types', file=filehandle)
         for name in self.typedict:
             tobj = self.typedict[name]
-            write('    Type', name, '->', etree.tostring(tobj.elem)[0:maxlen], file=filehandle)
+            write(
+                '    Type',
+                name,
+                '->',
+                etree.tostring(tobj.elem)[:maxlen],
+                file=filehandle,
+            )
         write('// Groups', file=filehandle)
         for name in self.groupdict:
             gobj = self.groupdict[name]
-            write('    Group', name, '->', etree.tostring(gobj.elem)[0:maxlen], file=filehandle)
+            write(
+                '    Group',
+                name,
+                '->',
+                etree.tostring(gobj.elem)[:maxlen],
+                file=filehandle,
+            )
         write('// Enums', file=filehandle)
         for name in self.enumdict:
             eobj = self.enumdict[name]
-            write('    Enum', name, '->', etree.tostring(eobj.elem)[0:maxlen], file=filehandle)
+            write(
+                '    Enum',
+                name,
+                '->',
+                etree.tostring(eobj.elem)[:maxlen],
+                file=filehandle,
+            )
         write('// Commands', file=filehandle)
         for name in self.cmddict:
             cobj = self.cmddict[name]
-            write('    Command', name, '->', etree.tostring(cobj.elem)[0:maxlen], file=filehandle)
+            write(
+                '    Command',
+                name,
+                '->',
+                etree.tostring(cobj.elem)[:maxlen],
+                file=filehandle,
+            )
         write('// APIs', file=filehandle)
         for key in self.apidict:
-            write('    API Version ', key, '->',
-                  etree.tostring(self.apidict[key].elem)[0:maxlen], file=filehandle)
+            write(
+                '    API Version ',
+                key,
+                '->',
+                etree.tostring(self.apidict[key].elem)[:maxlen],
+                file=filehandle,
+            )
         write('// Extensions', file=filehandle)
         for key in self.extdict:
-            write('    Extension', key, '->',
-                  etree.tostring(self.extdict[key].elem)[0:maxlen], file=filehandle)
+            write(
+                '    Extension',
+                key,
+                '->',
+                etree.tostring(self.extdict[key].elem)[:maxlen],
+                file=filehandle,
+            )
         write('// SPIR-V', file=filehandle)
         for key in self.spirvextdict:
-            write('    SPIR-V Extension', key, '->',
-                  etree.tostring(self.spirvextdict[key].elem)[0:maxlen], file=filehandle)
+            write(
+                '    SPIR-V Extension',
+                key,
+                '->',
+                etree.tostring(self.spirvextdict[key].elem)[:maxlen],
+                file=filehandle,
+            )
         for key in self.spirvcapdict:
-            write('    SPIR-V Capability', key, '->',
-                  etree.tostring(self.spirvcapdict[key].elem)[0:maxlen], file=filehandle)
+            write(
+                '    SPIR-V Capability',
+                key,
+                '->',
+                etree.tostring(self.spirvcapdict[key].elem)[:maxlen],
+                file=filehandle,
+            )
         write('// VkFormat', file=filehandle)
         for key in self.formatsdict:
-            write('    VkFormat', key, '->',
-                  etree.tostring(self.formatsdict[key].elem)[0:maxlen], file=filehandle)
+            write(
+                '    VkFormat',
+                key,
+                '->',
+                etree.tostring(self.formatsdict[key].elem)[:maxlen],
+                file=filehandle,
+            )
 
     def markTypeRequired(self, typename, required):
         """Require (along with its dependencies) or remove (but not its dependencies) a type.
@@ -753,8 +793,7 @@ class Registry:
                 # required. This does not un-tag dependencies in a <remove>
                 # tag. See comments in markRequired() below for the reason.
                 for attrib_name in ['requires', 'alias']:
-                    depname = typeinfo.elem.get(attrib_name)
-                    if depname:
+                    if depname := typeinfo.elem.get(attrib_name):
                         self.gen.logMsg('diag', 'Generating dependent type',
                                         depname, 'for', attrib_name, 'type', typename)
                         # Do not recurse on self-referential structures.
@@ -777,11 +816,7 @@ class Registry:
                 for subenum in typeinfo.elem.findall('.//enum'):
                     self.gen.logMsg('diag', 'markRequired: type requires dependent <enum>', subenum.text)
                     self.markEnumRequired(subenum.text, required)
-                # Tag type dependency in 'bitvalues' attributes as
-                # required. This ensures that the bit values for a flag
-                # are emitted
-                depType = typeinfo.elem.get('bitvalues')
-                if depType:
+                if depType := typeinfo.elem.get('bitvalues'):
                     self.gen.logMsg('diag', 'Generating bitflag type',
                                     depType, 'for type', typename)
                     self.markTypeRequired(depType, required)

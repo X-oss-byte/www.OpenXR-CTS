@@ -120,9 +120,7 @@ class OpenXRConventions(ConventionsBase):
         If an unrecognized spectype is given, returns None.
 
         """
-        if spectype == 'api' or spectype is None:
-            return 'OpenXR'
-        return None
+        return 'OpenXR' if spectype == 'api' or spectype is None else None
 
     @property
     def xml_supported_name_of_api(self):
@@ -186,7 +184,7 @@ class OpenXRConventions(ConventionsBase):
         For OpenXR, these are names with a case-insensitive 'xr' prefix, or
         a 'PFN_xr' function pointer type prefix.
         """
-        return name[0:2].lower() == 'xr' or name[0:6] == 'PFN_xr'
+        return name[:2].lower() == 'xr' or name[:6] == 'PFN_xr'
 
     def should_insert_may_alias_macro(self, genOpts):
         """Return true if we should insert a "may alias" macro in this file."""
@@ -196,7 +194,7 @@ class OpenXRConventions(ConventionsBase):
 
     def make_voidpointer_alias(self, tail):
         """Reformat a void * declaration to include the API alias macro"""
-        return '* XR_MAY_ALIAS{}'.format(tail[1:])
+        return f'* XR_MAY_ALIAS{tail[1:]}'
 
     def specURL(self, spectype='api'):
         """Return public registry URL which ref pages should link to for the

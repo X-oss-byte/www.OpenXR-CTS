@@ -47,14 +47,14 @@ def logHeader(severity):
     """Generate prefix for a diagnostic line using metadata and severity"""
     global logSourcefile, logProcname, logLine
 
-    msg = severity + ': '
+    msg = f'{severity}: '
     if logProcname:
-        msg = msg + ' in ' + logProcname
+        msg = f'{msg} in {logProcname}'
     if logSourcefile:
-        msg = msg + ' for ' + logSourcefile
+        msg = f'{msg} for {logSourcefile}'
     if logLine:
-        msg = msg + ' line ' + str(logLine)
-    return msg + ' '
+        msg = f'{msg} line {str(logLine)}'
+    return f'{msg} '
 
 def setLogFile(setDiag, setWarn, filename):
     """Set the file handle to log either or both warnings and diagnostics to.
@@ -66,11 +66,7 @@ def setLogFile(setDiag, setWarn, filename):
     if filename is None:
         return
 
-    if filename == '-':
-        fp = sys.stdout
-    else:
-        fp = open(filename, 'w', encoding='utf-8')
-
+    fp = sys.stdout if filename == '-' else open(filename, 'w', encoding='utf-8')
     if setDiag:
         diagFile = fp
     if setWarn:
@@ -104,7 +100,7 @@ def logErr(*args, **kwargs):
 
 def isempty(s):
     """Return True if s is nothing but white space, False otherwise"""
-    return len(''.join(s.split())) == 0
+    return not ''.join(s.split())
 
 class pageInfo:
     """Information about a ref page relative to the file it is extracted from."""
@@ -164,9 +160,9 @@ def printPageInfoField(desc, line, file):
     - line - field value or None
     - file - indexed by line"""
     if line is not None:
-        logDiag(desc + ':', line + 1, '\t-> ', file[line], end='')
+        logDiag(f'{desc}:', line + 1, '\t-> ', file[line], end='')
     else:
-        logDiag(desc + ':', line)
+        logDiag(f'{desc}:', line)
 
 def printPageInfo(pi, file):
     """Print out fields of a pageInfo struct
@@ -185,7 +181,7 @@ def printPageInfo(pi, file):
     printPageInfoField('BODY    ', pi.body,     file)
     printPageInfoField('VALIDITY', pi.validity, file)
     printPageInfoField('END     ', pi.end,      file)
-    logDiag('REFS: "' + pi.refs + '"')
+    logDiag(f'REFS: "{pi.refs}"')
 
 def prevPara(file, line):
     """Go back one paragraph from the specified line and return the line number
@@ -259,12 +255,7 @@ def clampToBlock(line, minline, maxline):
     If minline is None, do not clamp to that value."""
     if line is None:
         return line
-    if minline and line < minline:
-        return minline
-    if line > maxline:
-        return maxline
-
-    return line
+    return minline if minline and line < minline else min(line, maxline)
 
 def fixupRefs(pageMap, specFile, file):
     """Fill in missing fields in pageInfo structures, to the extent they can be
@@ -304,16 +295,15 @@ def fixupRefs(pageMap, specFile, file):
             pi.Warning = 'Can\'t identify end of ref page open block'
             continue
 
-        # If there is no description of the page, infer one from the type
         if pi.desc is None:
-            if pi.type is not None:
-                # pi.desc = pi.type[0:len(pi.type)-1] + ' (no short description available)'
-                pi.Warning = 'No short description available; could infer from the type and name'
-            else:
+            if pi.type is None:
                 pi.extractPage = False
                 pi.Warning = 'No short description available, cannot infer from the type'
                 continue
 
+            else:
+                # pi.desc = pi.type[0:len(pi.type)-1] + ' (no short description available)'
+                pi.Warning = 'No short description available; could infer from the type and name'
         # Try to determine where the parameter and body sections of the page
         # begin. funcpointer, proto, and struct pages infer the location of
         # the parameter and body sections. Other pages infer the location of
@@ -321,17 +311,15 @@ def fixupRefs(pageMap, specFile, file):
         #
         # Probably some other types infer this as well - refer to list of
         # all page types in genRef.py:emitPage()
-        if pi.include is not None:
-            if pi.type in ['funcpointers', 'protos', 'structs']:
-                pi.param = nextPara(file, pi.include)
-                if pi.body is None:
-                    pi.body = nextPara(file, pi.param)
-            else:
-                if pi.body is None:
-                    pi.body = nextPara(file, pi.include)
-        else:
+        if pi.include is None:
             pi.Warning = 'Page does not have an API definition include::'
 
+        elif pi.type in ['funcpointers', 'protos', 'structs']:
+            pi.param = nextPara(file, pi.include)
+            if pi.body is None:
+                pi.body = nextPara(file, pi.param)
+        elif pi.body is None:
+            pi.body = nextPara(file, pi.include)
         # It is possible for the inferred param and body lines to run past
         # the end of block, if, for example, there is no parameter section.
         pi.param = clampToBlock(pi.param, pi.include, pi.end)
@@ -362,19 +350,25 @@ def fixupRefs(pageMap, specFile, file):
                     logDiag('Skipping check for embedding in:', embed.name)
                     continue
                 if embed.begin is None or embed.end is None:
-                    logDiag('fixupRefs:', name + ':',
-                            'can\'t compare to unanchored ref:', embed.name,
-                            'in', specFile, 'at line', pi.include )
+                    logDiag(
+                        'fixupRefs:',
+                        f'{name}:',
+                        'can\'t compare to unanchored ref:',
+                        embed.name,
+                        'in',
+                        specFile,
+                        'at line',
+                        pi.include,
+                    )
                     printPageInfo(pi, file)
                     printPageInfo(embed, file)
-                # If an embed is found, change the error to a warning
                 elif (pi.include is not None and pi.include >= embed.begin and
                       pi.include <= embed.end):
                     logDiag('fixupRefs: Found embed for:', name,
                             'inside:', embedName,
                             'in', specFile, 'at line', pi.include )
                     pi.embed = embed.name
-                    pi.Warning = 'Embedded in definition for ' + embed.name
+                    pi.Warning = f'Embedded in definition for {embed.name}'
                     break
                 else:
                     logDiag('fixupRefs: No embed match for:', name,

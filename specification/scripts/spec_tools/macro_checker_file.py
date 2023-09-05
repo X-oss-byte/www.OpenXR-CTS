@@ -1,5 +1,6 @@
 """Provides MacroCheckerFile, a subclassable type that validates a single file in the spec."""
 
+
 # Copyright (c) 2018-2019 Collabora, Ltd.
 #
 # SPDX-License-Identifier: Apache-2.0
@@ -96,8 +97,7 @@ class Attrib(Enum):
     ANCHOR = 'anchor'
 
 
-VALID_REF_PAGE_ATTRIBS = set(
-    (e.value for e in Attrib))
+VALID_REF_PAGE_ATTRIBS = {e.value for e in Attrib}
 
 AttribData = namedtuple('AttribData', ['match', 'key', 'value'])
 
@@ -134,7 +134,7 @@ class BlockType(Enum):
     BOX = 'box'
 
     @classmethod
-    def lineToBlockType(self, line):
+    def lineToBlockType(cls, line):
         """Return a BlockType if the given line is a block delimiter.
 
         Returns None otherwise.
@@ -143,25 +143,18 @@ class BlockType(Enum):
             return BlockType.REF_PAGE_LIKE
         if line.startswith(CODE_BLOCK_DELIM):
             return BlockType.CODE
-        if line.startswith(BOX_BLOCK_DELIM):
-            return BlockType.BOX
-
-        return None
+        return BlockType.BOX if line.startswith(BOX_BLOCK_DELIM) else None
 
 
 def _pluralize(word, num):
     if num == 1:
         return word
-    if word.endswith('y'):
-        return word[:-1] + 'ies'
-    return word + 's'
+    return f'{word[:-1]}ies' if word.endswith('y') else f'{word}s'
 
 
 def _s_suffix(num):
     """Simplify pluralization."""
-    if num > 1:
-        return 's'
-    return ''
+    return 's' if num > 1 else ''
 
 
 def shouldEntityBeText(entity, subscript):
@@ -179,9 +172,7 @@ def shouldEntityBeText(entity, subscript):
     if ('*' in entity) or entity.startswith('_') or entity_only.endswith('_'):
         return True
 
-    if INTERNAL_PLACEHOLDER.search(entity):
-        return True
-    return False
+    return bool(INTERNAL_PLACEHOLDER.search(entity))
 
 
 class MacroCheckerFile(object):
@@ -268,8 +259,10 @@ class MacroCheckerFile(object):
 
         if self.block_stack:
             locations = (x.context for x in self.block_stack)
-            formatted_locations = ['{} opened at {}'.format(x.delimiter, self.getBriefLocation(x.context))
-                                   for x in self.block_stack]
+            formatted_locations = [
+                f'{x.delimiter} opened at {self.getBriefLocation(x.context)}'
+                for x in self.block_stack
+            ]
             self.logger.warning("Unclosed blocks: %s",
                                 ', '.join(formatted_locations))
 
@@ -289,34 +282,46 @@ class MacroCheckerFile(object):
                 continue
 
             if entity not in self.validity_includes:
-                self.warning(MessageId.MISSING_VALIDITY_INCLUDE,
-                             ['Saw /api/ include for {}, but no matching /validity/ include'.format(entity),
-                              'Expected a line with ' + regenerateIncludeFromMatch(includeContext.match, 'validity')],
-                             context=includeContext)
+                self.warning(
+                    MessageId.MISSING_VALIDITY_INCLUDE,
+                    [
+                        f'Saw /api/ include for {entity}, but no matching /validity/ include',
+                        'Expected a line with '
+                        + regenerateIncludeFromMatch(
+                            includeContext.match, 'validity'
+                        ),
+                    ],
+                    context=includeContext,
+                )
 
         # Check that we never include a /validity/ file
         # without a matching /api/ include
         for entity, includeContext in self.validity_includes.items():
             if entity not in self.fs_api_includes:
-                self.error(MessageId.MISSING_API_INCLUDE,
-                           ['Saw /validity/ include for {}, but no matching /api/ include'.format(entity),
-                            'Expected a line with ' + regenerateIncludeFromMatch(includeContext.match, 'api')],
-                           context=includeContext)
+                self.error(
+                    MessageId.MISSING_API_INCLUDE,
+                    [
+                        f'Saw /validity/ include for {entity}, but no matching /api/ include',
+                        'Expected a line with '
+                        + regenerateIncludeFromMatch(includeContext.match, 'api'),
+                    ],
+                    context=includeContext,
+                )
 
         if not self.numDiagnostics():
             # no problems, exit quietly
             return
 
-        print('\nFor file {}:'.format(self.filename))
+        print(f'\nFor file {self.filename}:')
 
         self.printMessageCounts()
         numFixes = len(self.fixes)
         if numFixes > 0:
-            fixes = ', '.join(('{} -> {}'.format(search, replace)
-                               for search, replace in self.fixes))
+            fixes = ', '.join(f'{search} -> {replace}' for search, replace in self.fixes)
 
-            print('{} unique auto-fix {} recorded: {}'.format(numFixes,
-                                                              _pluralize('pattern', numFixes), fixes))
+            print(
+                f"{numFixes} unique auto-fix {_pluralize('pattern', numFixes)} recorded: {fixes}"
+            )
 
     def processLine(self, lineNum, line):
         """Check the contents of a single line from a file.
@@ -357,10 +362,8 @@ class MacroCheckerFile(object):
             # Headings cause us to clear our pname_context
             self.pname_data = None
 
-            command = self.heading_command_re.match(line)
-            if command:
-                data = self.checker.findEntity(command)
-                if data:
+            if command := self.heading_command_re.match(line):
+                if data := self.checker.findEntity(command):
                     self.pname_data = data
             return
 
@@ -380,17 +383,16 @@ class MacroCheckerFile(object):
         if SKIP_LINE.match(line):
             return
 
-        ###
-        # Detect include:::....[] lines
-        match = INCLUDE.match(line)
-        if match:
+        if match := INCLUDE.match(line):
             self.match = match
             entity = match.group('entity_name')
 
             data = self.checker.findEntity(entity)
             if not data:
-                self.error(MessageId.UNKNOWN_INCLUDE,
-                           'Saw include for {}, but that entity is unknown.'.format(entity))
+                self.error(
+                    MessageId.UNKNOWN_INCLUDE,
+                    f'Saw include for {entity}, but that entity is unknown.',
+                )
                 self.pname_data = None
                 return
 
@@ -409,17 +411,23 @@ class MacroCheckerFile(object):
                 if entity in self.validity_includes:
                     name_and_line = toNameAndLine(
                         self.validity_includes[entity], root_path=self.checker.root_path)
-                    self.error(MessageId.API_VALIDITY_ORDER,
-                               ['/api/ include found for {} after a corresponding /validity/ include'.format(entity),
-                                'Validity include located at {}'.format(name_and_line)])
+                    self.error(
+                        MessageId.API_VALIDITY_ORDER,
+                        [
+                            f'/api/ include found for {entity} after a corresponding /validity/ include',
+                            f'Validity include located at {name_and_line}',
+                        ],
+                    )
 
             elif match.group('generated_type') == 'validity':
                 self.recordInclude(self.checker.validityIncludes)
                 self.validity_includes[entity] = self.storeMessageContext()
 
                 if entity not in self.pname_mentions:
-                    self.error(MessageId.API_VALIDITY_ORDER,
-                               '/validity/ include found for {} without a preceding /api/ include'.format(entity))
+                    self.error(
+                        MessageId.API_VALIDITY_ORDER,
+                        f'/validity/ include found for {entity} without a preceding /api/ include',
+                    )
                     return
 
                 if self.pname_mentions[entity]:
@@ -428,12 +436,18 @@ class MacroCheckerFile(object):
                     # so we can warn if we haven't seen a reference to every
                     # parameter/member.
                     members = self.checker.getMemberNames(entity)
-                    missing = [member for member in members
-                               if member not in self.pname_mentions[entity]]
-                    if missing:
-                        self.error(MessageId.UNDOCUMENTED_MEMBER,
-                                   ['Validity include found for {}, but not all members/params apparently documented'.format(entity),
-                                    'Members/params not mentioned with pname: {}'.format(', '.join(missing))])
+                    if missing := [
+                        member
+                        for member in members
+                        if member not in self.pname_mentions[entity]
+                    ]:
+                        self.error(
+                            MessageId.UNDOCUMENTED_MEMBER,
+                            [
+                                f'Validity include found for {entity}, but not all members/params apparently documented',
+                                f"Members/params not mentioned with pname: {', '.join(missing)}",
+                            ],
+                        )
 
             # If we found an include line, we're done with this line.
             return
@@ -490,9 +504,7 @@ class MacroCheckerFile(object):
             entity = match.group('entity_name')
             self.match = match
             self.entity = entity
-            data = self.checker.findEntity(entity)
-            if data:
-
+            if data := self.checker.findEntity(entity):
                 if data.category == EXTENSION_CATEGORY:
                     # Ah, this is an extension
                     self.warning(MessageId.EXTENSION, "Seems like this is an extension name that was not linked.",
@@ -500,40 +512,39 @@ class MacroCheckerFile(object):
                 else:
                     macro = data.macro
                     category = data.category
-                    self.warning(MessageId.MISSING_MACRO,
-                                 ['Seems like a "{}" macro was omitted for this reference to a known entity in category "{}".'.format(macro, category),
-                                  'Wrap in ` ` to silence this if you do not want a verified macro here.'],
-                                 group='entity_name',
-                                 replacement=self.makeMacroMarkup(data.macro))
-            else:
-
-                dataArray = self.checker.findEntityCaseInsensitive(entity)
-                # We might have found the goof...
-
-                if dataArray:
-                    if len(dataArray) == 1:
-                        # Yep, found the goof:
-                        # incorrect macro and entity capitalization
-                        data = dataArray[0]
-                        if data.category == EXTENSION_CATEGORY:
-                            # Ah, this is an extension
-                            self.warning(MessageId.EXTENSION,
-                                         "Seems like this is an extension name that was not linked.",
-                                         group='entity_name', replacement=self.makeExtensionLink(data.entity))
-                        else:
-                            self.warning(MessageId.MISSING_MACRO,
-                                         'Seems like a macro was omitted for this reference to a known entity in category "{}"'
-                                         ', found by searching case-insensitively.'.format(
-                                             data.category),
-                                         replacement=self.makeMacroMarkup(data=data))
-
+                    self.warning(
+                        MessageId.MISSING_MACRO,
+                        [
+                            f'Seems like a "{macro}" macro was omitted for this reference to a known entity in category "{category}".',
+                            'Wrap in ` ` to silence this if you do not want a verified macro here.',
+                        ],
+                        group='entity_name',
+                        replacement=self.makeMacroMarkup(data.macro),
+                    )
+            elif dataArray := self.checker.findEntityCaseInsensitive(entity):
+                if len(dataArray) == 1:
+                    # Yep, found the goof:
+                    # incorrect macro and entity capitalization
+                    data = dataArray[0]
+                    if data.category == EXTENSION_CATEGORY:
+                        # Ah, this is an extension
+                        self.warning(MessageId.EXTENSION,
+                                     "Seems like this is an extension name that was not linked.",
+                                     group='entity_name', replacement=self.makeExtensionLink(data.entity))
                     else:
-                        # Ugh, more than one resolution
+                        self.warning(
+                            MessageId.MISSING_MACRO,
+                            f'Seems like a macro was omitted for this reference to a known entity in category "{data.category}", found by searching case-insensitively.',
+                            replacement=self.makeMacroMarkup(data=data),
+                        )
 
-                        self.warning(MessageId.MISSING_MACRO,
-                                     ['Seems like a macro was omitted for this reference to a known entity, found by searching case-insensitively.',
-                                      'More than one apparent match.'],
-                                     group='entity_name', see_also=dataArray[:])
+                else:
+                    # Ugh, more than one resolution
+
+                    self.warning(MessageId.MISSING_MACRO,
+                                 ['Seems like a macro was omitted for this reference to a known entity, found by searching case-insensitively.',
+                                  'More than one apparent match.'],
+                                 group='entity_name', see_also=dataArray[:])
 
         ###
         # Main operations: detect markup macros
@@ -674,8 +685,11 @@ class MacroCheckerFile(object):
         ###
         # Non-existent macros
         if macro in NON_EXISTENT_MACROS:
-            self.error(MessageId.BAD_MACRO, '{} is not a macro provided in the specification, despite resembling other macros.'.format(
-                macro), group='macro')
+            self.error(
+                MessageId.BAD_MACRO,
+                f'{macro} is not a macro provided in the specification, despite resembling other macros.',
+                group='macro',
+            )
 
         ###
         # Wildcards (or leading underscore, or square brackets)
@@ -688,8 +702,7 @@ class MacroCheckerFile(object):
             assert match
             # See if there's an immediately-preceding entity
             preceding = self.line[:match.start()]
-            scope = PRECEDING_MEMBER_REFERENCE.search(preceding)
-            if scope:
+            if scope := PRECEDING_MEMBER_REFERENCE.search(preceding):
                 # Yes there is, check it out.
                 self.checkPname(scope.group('entity_name'))
             elif self.current_ref_page is not None:
@@ -698,10 +711,6 @@ class MacroCheckerFile(object):
             elif self.pname_data is not None:
                 # No, but there is a pname_context - better than nothing.
                 self.checkPnameImpliedContext(self.pname_data)
-            else:
-                # no, and no existing context we can imply:
-                # can't check this.
-                pass
 
     def checkRecognizedEntity(self):
         """Check the current macro:entity match to see if it is recognized.
@@ -722,31 +731,27 @@ class MacroCheckerFile(object):
         possibleCats = self.checker.entity_db.getCategoriesForMacro(macro)
         if possibleCats is None:
             possibleCats = ['???']
-        msg = ['Definition of link target {} with macro {} (used for {} {}) does not exist.'.format(
-            entity,
-            macro,
-            _pluralize('category', len(possibleCats)),
-            ', '.join(possibleCats))]
+        msg = [
+            f"Definition of link target {entity} with macro {macro} (used for {_pluralize('category', len(possibleCats))} {', '.join(possibleCats)}) does not exist."
+        ]
 
-        data = self.checker.findEntity(entity)
-        if data:
+        if data := self.checker.findEntity(entity):
             # We found the goof: incorrect macro
-            msg.append('Apparently matching entity in category {} found.'.format(
-                data.category))
+            msg.append(f'Apparently matching entity in category {data.category} found.')
             self.handleWrongMacro(msg, data)
             return True
 
         see_also = []
-        dataArray = self.checker.findEntityCaseInsensitive(entity)
-        if dataArray:
+        if dataArray := self.checker.findEntityCaseInsensitive(entity):
             # We might have found the goof...
 
             if len(dataArray) == 1:
                 # Yep, found the goof:
                 # incorrect macro and entity capitalization
                 data = dataArray[0]
-                msg.append('Apparently matching entity in category {} found by searching case-insensitively.'.format(
-                    data.category))
+                msg.append(
+                    f'Apparently matching entity in category {data.category} found by searching case-insensitively.'
+                )
                 self.handleWrongMacro(msg, data)
                 return True
             else:
@@ -770,15 +775,21 @@ class MacroCheckerFile(object):
             else:
                 # Doesn't match our pattern,
                 # so probably should be name instead of link.
-                newMacro = macro[0] + 'name'
+                newMacro = f'{macro[0]}name'
                 if self.checker.entity_db.isValidMacro(newMacro):
                     self.error(MessageId.BAD_ENTITY, msg +
                                ['Entity name does not fit the pattern for this API, which would mean it should be a "name" macro instead of a "link" macro'],
                                group='macro', replacement=newMacro, fix=self.makeFix(newMacro=newMacro), see_also=see_also)
                 else:
-                    self.error(MessageId.BAD_ENTITY, msg +
-                               ['Entity name does not fit the pattern for this API, which would mean it should be a "name" macro instead of a "link" macro',
-                                'However, {} is not a known macro so cannot auto-fix.'.format(newMacro)], see_also=see_also)
+                    self.error(
+                        MessageId.BAD_ENTITY,
+                        msg
+                        + [
+                            'Entity name does not fit the pattern for this API, which would mean it should be a "name" macro instead of a "link" macro',
+                            f'However, {newMacro} is not a known macro so cannot auto-fix.',
+                        ],
+                        see_also=see_also,
+                    )
 
         elif macro == 'ename':
             # TODO This might be an ambiguity in the style guide - ename might be a known enumerant value,
@@ -786,13 +797,14 @@ class MacroCheckerFile(object):
             # hard to check this.
             if self.checker.likelyRecognizedEntity(entity):
                 if not self.checkText():
-                    self.warning(MessageId.BAD_ENUMERANT, msg +
-                                 ['Unrecognized ename:{} that we would expect to recognize since it fits the pattern for this API.'.format(entity)],
-                                 see_also=see_also)
-        else:
-            # This is fine:
-            # it doesn't need to be recognized since it's not linked.
-            pass
+                    self.warning(
+                        MessageId.BAD_ENUMERANT,
+                        msg
+                        + [
+                            f'Unrecognized ename:{entity} that we would expect to recognize since it fits the pattern for this API.'
+                        ],
+                        see_also=see_also,
+                    )
         # Don't skip other tests.
         return False
 
@@ -808,28 +820,40 @@ class MacroCheckerFile(object):
         entity = self.entity
         shouldBeText = shouldEntityBeText(entity, self.subscript)
         assert macro
-        if shouldBeText and not macro.endswith('text') and not macro == 'code':
-            newMacro = macro[0] + 'text'
+        if shouldBeText and not macro.endswith('text') and macro != 'code':
+            newMacro = f'{macro[0]}text'
             if self.checker.entity_db.getCategoriesForMacro(newMacro):
-                self.error(MessageId.MISSING_TEXT,
-                           ['Asterisk/leading or trailing underscore/bracket found - macro should end with "text:", probably {}:'.format(newMacro),
-                            AUTO_FIX_STRING],
-                           group='macro', replacement=newMacro, fix=self.makeFix(newMacro=newMacro))
+                self.error(
+                    MessageId.MISSING_TEXT,
+                    [
+                        f'Asterisk/leading or trailing underscore/bracket found - macro should end with "text:", probably {newMacro}:',
+                        AUTO_FIX_STRING,
+                    ],
+                    group='macro',
+                    replacement=newMacro,
+                    fix=self.makeFix(newMacro=newMacro),
+                )
             else:
-                self.error(MessageId.MISSING_TEXT,
-                           ['Asterisk/leading or trailing underscore/bracket found, so macro should end with "text:".',
-                            'However {}: is not a known macro so cannot auto-fix.'.format(newMacro)],
-                           group='macro')
+                self.error(
+                    MessageId.MISSING_TEXT,
+                    [
+                        'Asterisk/leading or trailing underscore/bracket found, so macro should end with "text:".',
+                        f'However {newMacro}: is not a known macro so cannot auto-fix.',
+                    ],
+                    group='macro',
+                )
             return True
         elif macro.endswith('text') and not shouldBeText:
             msg = [
-                "No asterisk/leading or trailing underscore/bracket in the entity, so this might be a mistaken use of the 'text' macro {}:".format(macro)]
-            data = self.checker.findEntity(entity)
-            if data:
-                # We found the goof: incorrect macro
-                msg.append('Apparently matching entity in category {} found.'.format(
-                    data.category))
-                msg.append(AUTO_FIX_STRING)
+                f"No asterisk/leading or trailing underscore/bracket in the entity, so this might be a mistaken use of the 'text' macro {macro}:"
+            ]
+            if data := self.checker.findEntity(entity):
+                msg.extend(
+                    (
+                        f'Apparently matching entity in category {data.category} found.',
+                        AUTO_FIX_STRING,
+                    )
+                )
                 replacement = self.makeFix(data=data)
                 if data.category == EXTENSION_CATEGORY:
                     self.error(MessageId.EXTENSION, msg,
@@ -847,13 +871,13 @@ class MacroCheckerFile(object):
                     # Only suggest a macro if we aren't in elink/ename/etext,
                     # since ename and elink are not related in an equivalent way
                     # to the relationship between flink and fname.
-                    newMacro = macro[0] + 'name'
+                    newMacro = f'{macro[0]}name'
                     if self.checker.entity_db.getCategoriesForMacro(newMacro):
-                        msg.append(
-                            'Consider if {}: might be the correct macro to use here.'.format(newMacro))
+                        msg.append(f'Consider if {newMacro}: might be the correct macro to use here.')
                     else:
                         msg.append(
-                            'Cannot suggest a new macro because {}: is not a known macro.'.format(newMacro))
+                            f'Cannot suggest a new macro because {newMacro}: is not a known macro.'
+                        )
                 self.warning(MessageId.MISUSED_TEXT, msg)
             return True
         return False
@@ -896,14 +920,21 @@ class MacroCheckerFile(object):
             # and <param>?
             return
         if not members:
-            self.warning(MessageId.UNRECOGNIZED_CONTEXT,
-                         'pname context entity was un-recognized {}'.format(pname_context))
+            self.warning(
+                MessageId.UNRECOGNIZED_CONTEXT,
+                f'pname context entity was un-recognized {pname_context}',
+            )
             return
 
         if entity not in members:
-            self.warning(MessageId.UNKNOWN_MEMBER, ["Could not find member/param named '{}' in {}".format(entity, pname_context),
-                                                    'Known {} mamber/param names are: {}'.format(
-                pname_context, ', '.join(members))], group='entity_name')
+            self.warning(
+                MessageId.UNKNOWN_MEMBER,
+                [
+                    f"Could not find member/param named '{entity}' in {pname_context}",
+                    f"Known {pname_context} mamber/param names are: {', '.join(members)}",
+                ],
+                group='entity_name',
+            )
 
     def checkIncludeRefPageRelation(self, entity, generated_type):
         """Identify if our current ref page (or lack thereof) is appropriate for an include just recorded.
@@ -930,10 +961,9 @@ class MacroCheckerFile(object):
         if ref_page_entity == expected_ref_page_entity:
             # OK, this is a total match.
             pass
-        elif self.checker.entity_db.areAliases(expected_ref_page_entity, ref_page_entity):
-            # This appears to be a promoted synonym which is OK.
-            pass
-        else:
+        elif not self.checker.entity_db.areAliases(
+            expected_ref_page_entity, ref_page_entity
+        ):
             # OK, we are in a ref page block that doesn't match
             self.handleIncludeMismatchRefPage(entity, generated_type)
 

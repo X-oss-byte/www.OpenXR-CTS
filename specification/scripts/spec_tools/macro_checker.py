@@ -48,11 +48,10 @@ class MacroChecker(object):
         # NOT followed by >> and NOT preceded by one of the characters in that first character class.
         # (which distinguish "names being used somewhere other than prose").
         self.suspected_missing_macro_re = re.compile(
-            r'\b(?<![-=:/[\.`+,])(?P<entity_name>{}[\w*]+)\b(?!>>)'.format(
-                self.entity_db.case_insensitive_name_prefix_pattern)
+            f'\b(?<![-=:/[\.`+,])(?P<entity_name>{self.entity_db.case_insensitive_name_prefix_pattern}[\w*]+)\b(?!>>)'
         )
         self.heading_command_re = re.compile(
-            r'=+ (?P<command>{}[\w]+)'.format(self.entity_db.name_prefix)
+            f'=+ (?P<command>{self.entity_db.name_prefix}[\w]+)'
         )
 
         macros_pattern = '|'.join((re.escape(macro)
@@ -60,7 +59,8 @@ class MacroChecker(object):
         # the "formatting" group is to strip matching */**/_/__
         # surrounding an entire macro.
         self.macro_re = re.compile(
-            r'(?P<formatting>\**|_*)(?P<macro>{}):(?P<entity_name>[\w*]+((?P<subscript>[\[][^\]]*[\]]))?)(?P=formatting)'.format(macros_pattern))
+            f'(?P<formatting>\**|_*)(?P<macro>{macros_pattern}):(?P<entity_name>[\w*]+((?P<subscript>[\[][^\]]*[\]]))?)(?P=formatting)'
+        )
 
     def haveLinkTarget(self, entity):
         """Report if we have parsed an API include (or heading) for an entity.
@@ -69,16 +69,11 @@ class MacroChecker(object):
         """
         if not self.findEntity(entity):
             return None
-        if entity in self.apiIncludes:
-            return True
-        return entity in self.headings
+        return True if entity in self.apiIncludes else entity in self.headings
 
     def hasFixes(self):
         """Report if any files have auto-fixes."""
-        for f in self.files:
-            if f.hasFixes():
-                return True
-        return False
+        return any(f.hasFixes() for f in self.files)
 
     def addLinkToEntity(self, entity, context):
         """Record seeing a link to an entity's docs from a context."""
@@ -162,12 +157,10 @@ class MacroChecker(object):
             # block-quoting in tests
             s = "\n".join((line.lstrip() for line in s.split("\n")))
             # fabricate a "filename" that will display better.
-            filename = "string{}\n****START OF STRING****\n{}\n****END OF STRING****\n".format(
-                len(self.files), s.rstrip())
+            filename = f"string{len(self.files)}\n****START OF STRING****\n{s.rstrip()}\n****END OF STRING****\n"
 
         else:
-            filename = "string{}: {}".format(
-                len(self.files), s.rstrip())
+            filename = f"string{len(self.files)}: {s.rstrip()}"
 
         class StringStreamMaker(object):
             def __init__(self, string):

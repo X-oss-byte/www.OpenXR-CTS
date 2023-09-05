@@ -40,11 +40,11 @@ def presort_key(code: str) -> Tuple[int, str]:
 
 
 def sort_attribute(cmd: ET.ElementBase, attr_name: str):
-    codes = get_codes(cmd, attr_name)
-    if not codes:
+    if codes := get_codes(cmd, attr_name):
+        cmd.set(attr_name, ",".join(sorted(codes, reverse=True, key=presort_key)))
+    else:
         # Probably an alias or something.
         return
-    cmd.set(attr_name, ",".join(sorted(codes, reverse=True, key=presort_key)))
 
 
 def main():

@@ -10,16 +10,14 @@ from shared import (PLATFORMS, TRUE_FALSE, VS_VERSION, make_win_artifact_name,
 if __name__ == "__main__":
 
     configs = {}
-    for  platform, debug, uwp in product(PLATFORMS, (False,), TRUE_FALSE):
+    for platform, debug, uwp in product(PLATFORMS, (False,), TRUE_FALSE):
         # No need to support ARM/ARM64 except for UWP.
-        if not uwp and (platform.lower() == 'arm' or platform.lower() == 'arm64'):
+        if not uwp and platform.lower() in ['arm', 'arm64']:
             continue
 
         label = [platform]
-        config = []
         generator = VS_VERSION
-        config.append('-A ' + platform)
-        config.append('-DDYNAMIC_LOADER=ON')
+        config = [f'-A {platform}', '-DDYNAMIC_LOADER=ON']
         if debug:
             label.append('debug')
         if uwp:
