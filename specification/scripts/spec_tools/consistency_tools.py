@@ -22,7 +22,7 @@ from .conventions import ConventionsBase
 
 def _get_extension_tags(reg):
     """Get a set of all author tags registered for use."""
-    return set(elt.get("name") for elt in reg.tree.findall("./tags/tag[@name]"))
+    return {elt.get("name") for elt in reg.tree.findall("./tags/tag[@name]")}
 
 
 class XMLChecker:
@@ -103,8 +103,7 @@ class XMLChecker:
             specified_codes.update(codes)
 
         self.return_codes: Set[str]
-        unrecognized = specified_codes - self.return_codes
-        if unrecognized:
+        if unrecognized := specified_codes - self.return_codes:
             raise RuntimeError("Return code mentioned in script that isn't in the registry: " +
                                ', '.join(unrecognized))
 
@@ -249,13 +248,11 @@ class XMLChecker:
             print('-------------------')
             print('Messages for', entity)
             print()
-            messages = self.errors.get(entity)
-            if messages:
+            if messages := self.errors.get(entity):
                 for m in messages:
                     print('Error:', m)
 
-            messages = self.warnings.get(entity)
-            if messages:
+            if messages := self.warnings.get(entity):
                 for m in messages:
                     print('Warning:', m)
 
@@ -280,21 +277,15 @@ class XMLChecker:
                 "Space (or other delimiter text) missing between </type> and <name> for param/member named",
                 param_name)
 
-        # Check external sync entries
-        externsyncs = ExternSyncEntry.parse_externsync_from_param(param)
-        if externsyncs:
+        if externsyncs := ExternSyncEntry.parse_externsync_from_param(param):
             for entry in externsyncs:
                 if entry.entirely_extern_sync:
                     if len(externsyncs) > 1:
                         self.record_error("Comma-separated list in externsync attribute includes 'true' for",
                                           param_name)
-                else:
-                    # member name
-                    # TODO only looking at the superficial feature here,
-                    # not entry.param_ref_parts
-                    if entry.member != param_name:
-                        self.record_error("externsync attribute for", param_name,
-                                          "refers to some other member/parameter:", entry.member)
+                elif entry.member != param_name:
+                    self.record_error("externsync attribute for", param_name,
+                                      "refers to some other member/parameter:", entry.member)
 
     def check_params(self, params):
         """Check the members of a struct or params of a function.
@@ -305,9 +296,7 @@ class XMLChecker:
         for param in params:
             self.check_param(param)
 
-            # Check for parameters referenced by len= attribute
-            lengths = LengthEntry.parse_len_from_param(param)
-            if lengths:
+            if lengths := LengthEntry.parse_len_from_param(param):
                 for entry in lengths:
                     if not entry.other_param_name:
                         continue
@@ -351,8 +340,7 @@ class XMLChecker:
             type_member = findNamedElem(
                 members, self.conventions.structtype_member_name)
             if type_member is not None:
-                val = type_member.get('values')
-                if val:
+                if val := type_member.get('values'):
                     expected = self.conventions.generate_structure_type_from_name(
                         name)
                     if val != expected:
@@ -385,7 +373,7 @@ class XMLChecker:
         extension_number = info.elem.get('number')
         if extension_number is not None and extension_number != '0':
             if extension_number in self.ext_numbers:
-                self.record_error('Duplicate extension number ' + extension_number)
+                self.record_error(f'Duplicate extension number {extension_number}')
             else:
                 self.ext_numbers.add(extension_number)
 
@@ -409,17 +397,9 @@ class XMLChecker:
 
         # Some minimal return code checking
         errorcodes = elem.get("errorcodes")
-        if errorcodes:
-            errorcodes = errorcodes.split(",")
-        else:
-            errorcodes = []
-
+        errorcodes = errorcodes.split(",") if errorcodes else []
         successcodes = elem.get("successcodes")
-        if successcodes:
-            successcodes = successcodes.split(",")
-        else:
-            successcodes = []
-
+        successcodes = successcodes.split(",") if successcodes else []
         if not successcodes and not errorcodes:
             # Early out if no return codes.
             return
@@ -476,16 +456,14 @@ class XMLChecker:
         May extend."""
         referenced_input = self.referenced_input_types[name]
         referenced_types = self.referenced_types[name]
-        error_prefix = self.conventions.api_prefix + "ERROR"
+        error_prefix = f"{self.conventions.api_prefix}ERROR"
 
-        bad_success = {x for x in successcodes if x.startswith(error_prefix)}
-        if bad_success:
+        if bad_success := {x for x in successcodes if x.startswith(error_prefix)}:
             self.record_error("Found error code(s)",
                               ",".join(bad_success),
                               "listed in the successcodes attributes")
 
-        bad_errors = {x for x in errorcodes if not x.startswith(error_prefix)}
-        if bad_errors:
+        if bad_errors := {x for x in errorcodes if not x.startswith(error_prefix)}:
             self.record_error("Found success code(s)",
                               ",".join(bad_errors),
                               "listed in the errorcodes attributes")
@@ -494,8 +472,7 @@ class XMLChecker:
         for referenced_type in referenced_input:
             required_codes = self.get_codes_for_command_and_type(
                 name, referenced_type)
-            missing_codes = required_codes - codes
-            if missing_codes:
+            if missing_codes := required_codes - codes:
                 path = self.referenced_input_types.shortest_path(
                     name, referenced_type)
                 path_str = " -> ".join(path)
@@ -506,16 +483,14 @@ class XMLChecker:
                                   "found via path",
                                   path_str)
 
-        # Check that we have all the codes we expect based on command name.
-        missing_codes = self.get_required_codes_for_command(name) - codes
-        if missing_codes:
+        if missing_codes := self.get_required_codes_for_command(name) - codes:
             self.record_error("Missing expected return code(s)",
                               ",".join(missing_codes),
                               "implied because of the name of this command")
 
-        # Check that we don't have any codes forbidden based on command name.
-        forbidden = self.get_forbidden_codes_for_command(name).intersection(codes)
-        if forbidden:
+        if forbidden := self.get_forbidden_codes_for_command(name).intersection(
+            codes
+        ):
             self.record_error("Got return code(s)",
                               ", ".join(forbidden),
                               "that were forbidden due to the name of this command")
@@ -576,11 +551,7 @@ class XMLChecker:
         """Return True if the given message, for this entity, should be suppressed."""
         if not self.entity_suppressions:
             return False
-        for suppress in self.entity_suppressions:
-            if suppress in message:
-                return True
-
-        return False
+        return any(suppress in message for suppress in self.entity_suppressions)
 
     def _prepend_sourceline_to_message(self, message, **kwargs):
         """Prepend a file and/or line reference to the message, if possible.
@@ -604,16 +575,12 @@ class XMLChecker:
                 if self.reg.filename:
                     fn = self.reg.filename
 
-        if fn is None and sourceline is None:
-            return message
-
         if fn is None:
-            return "Line {}: {}".format(sourceline, message)
-
+            return message if sourceline is None else f"Line {sourceline}: {message}"
         if sourceline is None:
-            return "{}: {}".format(fn, message)
+            return f"{fn}: {message}"
 
-        return "{}:{}: {}".format(fn, sourceline, message)
+        return f"{fn}:{sourceline}: {message}"
 
 
 class HandleParents(RecursiveMemoize):
@@ -694,16 +661,17 @@ class ReferencedTypes(RecursiveMemoize):
 
         Memoizes its results."""
         if type_name not in self._directly_referenced:
-            members = self.db.getMemberElems(type_name)
-            if members:
+            if members := self.db.getMemberElems(type_name):
                 types = ((member, member.find("type")) for member in members)
-                self._directly_referenced[type_name] = set(type_elem.text for (member, type_elem) in types
-                                                           if type_elem is not None and self.predicate(member))
+                self._directly_referenced[type_name] = {
+                    type_elem.text
+                    for (member, type_elem) in types
+                    if type_elem is not None and self.predicate(member)
+                }
 
             else:
                 self._directly_referenced[type_name] = set()
-            children = self.db.childTypes(type_name)
-            if children:
+            if children := self.db.childTypes(type_name):
                 self._directly_referenced[type_name].update(children)
             # Update graph
             self.graph.add_node(type_name)
@@ -751,8 +719,9 @@ class HandleData:
             handle_parents = self.ancestors_dict
 
             def get_descendants(handle):
-                return set(h for h in handle_parents.keys()
-                           if handle in handle_parents[h])
+                return {
+                    h for h in handle_parents.keys() if handle in handle_parents[h]
+                }
 
             self._descendants = {
                 h: get_descendants(h)

@@ -21,12 +21,14 @@ def generate_reserved_extensions(vendor: str, first_extension: int, extensions: 
     """Prints extension reservation XML."""
     vendor = vendor.upper()
     for num in range(first_extension, first_extension + extensions):
-        print("    " + f"""
+        print(
+            f'    {f"""
     <extension name="XR_{vendor}_extension_{num}" number="{num}" type="instance" supported="disabled">
         <require>
             <enum value="1"                                 name="XR_{vendor}_extension_{num}_SPEC_VERSION"/>
             <enum value="&quot;XR_{vendor}_extension_{num}&quot;" name="XR_{vendor}_EXTENSION_{num}_EXTENSION_NAME"/>
         </require>
     </extension>
-        """.strip())
+        """.strip()}'
+        )
         print()

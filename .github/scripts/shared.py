@@ -31,10 +31,7 @@ class BuildConfig:
         return not self.uwp and not self.should_skip()
 
     def preset(self) -> str:
-        if self.uwp:
-            return f"{self.arch.lower()}_uwp"
-
-        return self.arch.lower()
+        return f"{self.arch.lower()}_uwp" if self.uwp else self.arch.lower()
 
     def win_artifact_name(self) -> str:
         return f"loader_{self.preset()}"
@@ -43,9 +40,7 @@ class BuildConfig:
         return f"loader_{self.preset()}"
 
     def platform_dirname(self) -> str:
-        if self.uwp:
-            return f"{self.arch}_uwp"
-        return self.arch
+        return f"{self.arch}_uwp" if self.uwp else self.arch
 
 
 _UNFILTERED_BUILD_CONFIGS = [

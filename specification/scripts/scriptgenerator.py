@@ -17,9 +17,7 @@ def mostOfficial(api, newapi):
         return newapi;
     if api[-3:] == 'EXT':
         return api
-    if newapi[-3:] == 'EXT':
-        return newapi;
-    return api
+    return newapi if newapi[-3:] == 'EXT' else api
 
 class ScriptOutputGenerator(OutputGenerator):
     """ScriptOutputGenerator - subclass of OutputGenerator.
@@ -97,9 +95,7 @@ class ScriptOutputGenerator(OutputGenerator):
         - feature - name of the feature being generated
         - key - API category - 'define', 'basetype', etc."""
 
-        dict = self.featureDictionary[feature][key]
-
-        if dict:
+        if dict := self.featureDictionary[feature][key]:
             # Not clear why handling of command vs. type APIs is different -
             # see interfacedocgenerator.py, which this was based on.
             if key == 'command':
@@ -181,8 +177,8 @@ class ScriptOutputGenerator(OutputGenerator):
            matches logic in this call."""
 
         pat = 'VkExternalFenceFeatureFlagBits'
-        if name[0:len(pat)] == pat:
-            print('{}(name = {}) matches {}'.format(procname, name, pat))
+        if name[: len(pat)] == pat:
+            print(f'{procname}(name = {name}) matches {pat}')
             import pdb
             pdb.set_trace()
 
@@ -224,13 +220,10 @@ class ScriptOutputGenerator(OutputGenerator):
 
                 # May want to only emit full type definition when not an alias?
             else:
-                # Extract the type name
-                # (from self.genOpts). Copy other text through unchanged.
-                # If the resulting text is an empty string, do not emit it.
-                count = len(noneStr(typeElem.text))
-                for elem in typeElem:
-                    count += len(noneStr(elem.text)) + len(noneStr(elem.tail))
-
+                count = len(noneStr(typeElem.text)) + sum(
+                    len(noneStr(elem.text)) + len(noneStr(elem.tail))
+                    for elem in typeElem
+                )
             if count > 0:
                 if category == 'bitmask':
                     requiredEnum = typeElem.get('requires')

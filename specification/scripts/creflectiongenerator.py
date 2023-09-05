@@ -43,7 +43,7 @@ class StructData:
     def protect_string(self) -> Optional[str]:
         """The preprocessor expression to test for protection, or None"""
         if self.protect:
-            return " && ".join("defined({})".format(x) for x in self.protect)
+            return " && ".join(f"defined({x})" for x in self.protect)
 
 
 class BitmaskData:
@@ -79,15 +79,17 @@ class CReflectionOutputGenerator(OutputGenerator):
 
     def beginFile(self, genOpts):
         OutputGenerator.beginFile(self, genOpts)
-        self.template = JinjaTemplate(self.env, "template_{}".format(genOpts.filename))
+        self.template = JinjaTemplate(self.env, f"template_{genOpts.filename}")
 
     def _get_structs_for_protect(self, protect=None):
         """
         Get an array of structure objects available only with the given protects defined.
         """
-        ret = [x for x in self.structs
-               if x.protect == protect and x.structTypeName is not None]
-        return ret
+        return [
+            x
+            for x in self.structs
+            if x.protect == protect and x.structTypeName is not None
+        ]
 
     def endFile(self):
         assert(self.template)
@@ -114,9 +116,11 @@ class CReflectionOutputGenerator(OutputGenerator):
                 unprotected_structs=[s for s in unprotected_structs if s.typeName in child_names],
                 protect_sets_and_protected_structs=prot))
 
-        extensions = list(
-            ((name, data) for name, data in self.registry.extdict.items()
-             if data.supported != 'disabled'))
+        extensions = [
+            (name, data)
+            for name, data in self.registry.extdict.items()
+            if data.supported != 'disabled'
+        ]
 
         extensions.sort(key=lambda x: int(x[1].number))
         file_data += self.template.render(
@@ -169,15 +173,10 @@ class CReflectionOutputGenerator(OutputGenerator):
         protect = set()
         if self.featureExtraProtect:
             protect.update(self.featureExtraProtect.split(','))
-        localProtect = typeinfo.elem.get('protect')
-        if localProtect:
+        if localProtect := typeinfo.elem.get('protect'):
             protect.update(localProtect.split(','))
 
-        if protect:
-            protect = tuple(sorted(protect))
-        else:
-            protect = None
-
+        protect = tuple(sorted(protect)) if protect else None
         self.structs.append(StructData(typeName, structTypeEnum, members, protect))
         if protect:
             self.protects.add(protect)
@@ -204,9 +203,8 @@ class CReflectionOutputGenerator(OutputGenerator):
             expandPrefix = expandName
 
             expandSuffix = ''
-            expandSuffixMatch = re.search(r'[A-Z][A-Z]+$', groupName)
-            if expandSuffixMatch:
-                expandSuffix = '_' + expandSuffixMatch.group()
+            if expandSuffixMatch := re.search(r'[A-Z][A-Z]+$', groupName):
+                expandSuffix = f'_{expandSuffixMatch.group()}'
                 # Strip off the suffix from the prefix
                 expandPrefix = expandName.rsplit(expandSuffix, 1)[0]
 

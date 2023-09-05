@@ -549,11 +549,7 @@ if __name__ == '__main__':
     else:
         errWarn = sys.stderr
 
-    if args.diagfile:
-        diag = open(args.diagfile, 'w', encoding='utf-8')
-    else:
-        diag = None
-
+    diag = open(args.diagfile, 'w', encoding='utf-8') if args.diagfile else None
     if args.time:
         # Log diagnostics and warnings
         setLogFile(setDiag = True, setWarn = True, filename = '-')
@@ -585,7 +581,7 @@ if __name__ == '__main__':
     else:
         startTimer(args.time)
         reg.apiGen()
-        endTimer(args.time, '* Time to generate ' + options.filename + ' =')
+        endTimer(args.time, f'* Time to generate {options.filename} =')
 
     if not args.quiet:
         logDiag('* Generated', options.filename)

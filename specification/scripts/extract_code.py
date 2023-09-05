@@ -50,10 +50,9 @@ class Language(Enum):
     @classmethod
     def from_string(cls, s):
         s = s.upper()
-        for val in Language:
-            if s == str(val).upper():
-                return val
-        return Language.UNKNOWN
+        return next(
+            (val for val in Language if s == str(val).upper()), Language.UNKNOWN
+        )
 
 
 class CodeExtractor(LinewiseFileProcessor):
@@ -67,7 +66,7 @@ class CodeExtractor(LinewiseFileProcessor):
         self.next_snippet_id = 0
         self.in_code_block = False
         self.block_pattern = re.compile(r'\[source(,?)(?P<tags>.*)\]')
-        self.languages_to_extract = set((Language.CPP, Language.C))
+        self.languages_to_extract = {Language.CPP, Language.C}
         self.code_lines = None
 
         self.generated_files = []
@@ -91,7 +90,7 @@ class CodeExtractor(LinewiseFileProcessor):
 
     def print_message(self, s):
         if not self.quiet:
-            print('{}:{}: {}'.format(self.filename, self.line_number, s))
+            print(f'{self.filename}:{self.line_number}: {s}')
 
     def process_start_of_code_block(self):
         prev_line = self.get_preceding_line()
@@ -112,13 +111,15 @@ class CodeExtractor(LinewiseFileProcessor):
                 self.language = lang
                 break
         if self.language == Language.UNKNOWN:
-            self.print_message('Not extracting code snippet introduced with {} (tags = {})'.format(
-                code_block_tag.group(), tags))
+            self.print_message(
+                f'Not extracting code snippet introduced with {code_block_tag.group()} (tags = {tags})'
+            )
             return
 
         if self.language not in self.languages_to_extract:
-            self.print_message('Not extracting code snippet identified as {}'.format(
-                self.language))
+            self.print_message(
+                f'Not extracting code snippet identified as {self.language}'
+            )
             return
         if 'SUPPRESS-BUILD' in tags:
             self.print_message(
@@ -137,12 +138,14 @@ class CodeExtractor(LinewiseFileProcessor):
 
         if len(code_lines) < self.MIN_LINES:
             self.print_message(
-                'Not extracting code snippet - only {} lines.'.format(len(code_lines)))
+                f'Not extracting code snippet - only {len(code_lines)} lines.'
+            )
             return
 
         out_filename = self.make_numbered_filename(self.language)
-        self.print_message('Writing {} extracted lines to file {}\n'.format(
-            len(code_lines), out_filename.relative_to(Path('.').resolve())))
+        self.print_message(
+            f"Writing {len(code_lines)} extracted lines to file {out_filename.relative_to(Path('.').resolve())}\n"
+        )
         self.generated_files.append(out_filename)
 
         self.origins[out_filename] = self.start_of_code_block
@@ -152,7 +155,7 @@ class CodeExtractor(LinewiseFileProcessor):
         with out_filename.open('w', encoding='utf-8') as f:
             f.write('#include "common_include.h"\n')
             if include_file.exists():
-                f.write('#include "{}"\n\n'.format(include_file.name))
+                f.write(f'#include "{include_file.name}"\n\n')
                 self.deps.append((out_filename, include_file))
             f.write('void func() {\n')
             f.write(''.join(code_lines))
@@ -161,8 +164,7 @@ class CodeExtractor(LinewiseFileProcessor):
     def process_code_block_line(self):
         if self.code_lines is not None:
             if self.output_line_numbers:
-                self.code_lines.append('# {} "{}"\n'.format(
-                    self.line_number, self.filename))
+                self.code_lines.append(f'# {self.line_number} "{self.filename}"\n')
             self.code_lines.append(self.line)
 
     def process_line(self, line_num, line):
@@ -219,11 +221,11 @@ class CodeExtractorGroup(object):
                                               for fn in self.all_generated if fn.suffix == '.c')
             generated_cpp_string = ' \\\n'.join(str(fn)
                                                 for fn in self.all_generated if fn.suffix == '.cpp')
-            deps_string = '\n'.join('{}: {} $(CODEDIR)/common_include.h'.format(fn.with_suffix('.o'), dep)
-                                    for fn, dep in self.deps)
-            extra_arg = ''
-            if self.output_line_numbers:
-                extra_arg = '--line_numbers'
+            deps_string = '\n'.join(
+                f"{fn.with_suffix('.o')}: {dep} $(CODEDIR)/common_include.h"
+                for fn, dep in self.deps
+            )
+            extra_arg = '--line_numbers' if self.output_line_numbers else ''
             f.write("""
 OUTDIR  ?= $(CURDIR)/{out}
 CODEDIR ?= $(CURDIR)/{codedir}
@@ -281,12 +283,8 @@ gen: {script}
 
                 for generated, origin in self.origins.items():
                     origin_file, origin_line = origin
-                    if generated.suffix == '.cpp':
-                        compiler = '[c++] '
-                    else:
-                        compiler = '[cc]  '
-                    origin_str = '{} {} extracted from {}:{}'.format(compiler, generated.name.ljust(width),
-                                                                     origin_file, origin_line)
+                    compiler = '[c++] ' if generated.suffix == '.cpp' else '[cc]  '
+                    origin_str = f'{compiler} {generated.name.ljust(width)} extracted from {origin_file}:{origin_line}'
                     f.write('{obj}: ORIGIN := {originstr}\n'.format(
                         obj=generated.with_suffix('.o'), originstr=origin_str))
 
@@ -315,11 +313,7 @@ if __name__ == "__main__":
     # type=argparse.FileType('w', encoding='UTF-8'))
     args = parser.parse_args()
 
-    if args.file:
-        files = [Path(f).resolve() for f in args.file]
-    else:
-        files = ALL_DOCS
-
+    files = [Path(f).resolve() for f in args.file] if args.file else ALL_DOCS
     extractors = CodeExtractorGroup(output_line_numbers=args.line_numbers,
                                     quiet=args.quiet)
     extractors.process(files)

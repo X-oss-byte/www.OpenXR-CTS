@@ -28,8 +28,7 @@ def realignXML(fp):
     for line in lines:
         emitted = False
         for i in range(0,len(patterns)):
-            match = regexp[i].match(line)
-            if match:
+            if match := regexp[i].match(line):
                 if not emitted:
                     #print('# While processing line: ' + line, end='')
                     emitted = True

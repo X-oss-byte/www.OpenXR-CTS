@@ -219,20 +219,19 @@ class ReflowState:
 
          - A single letter (if breakInitial is True)
          - Abbreviations: 'c.f.', 'e.g.', 'i.e.' (or mixed-case versions)"""
-        if (word[-1:] != '.' or
-            endAbbrev.search(word) or
-                (self.breakInitial and endInitial.match(word))):
-            return False
-
-        return True
+        return (
+            word[-1:] == '.'
+            and not endAbbrev.search(word)
+            and (not self.breakInitial or not endInitial.match(word))
+        )
 
     def vuidAnchor(self, word):
         """Return True if word is a Valid Usage ID Tag anchor."""
-        return (word[0:7] == '[[VUID-')
+        return word[:7] == '[[VUID-'
 
     def isOpenBlockDelimiter(self, line):
         """Returns True if line is an open block delimiter."""
-        return line[0:2] == '--'
+        return line[:2] == '--'
 
     def reflowPara(self):
         """Reflow the current paragraph, respecting the paragraph lead and
@@ -277,10 +276,6 @@ class ReflowState:
                     # Trailing ' +' must stay on the same line
                     endEscape = word
                     # logDiag('reflowPara last word of line =', word, 'prevWord =', prevWord, 'endEscape =', endEscape)
-                else:
-                    pass
-                    # logDiag('reflowPara wordCount =', wordCount, 'word =', word, 'prevWord =', prevWord)
-
                 if wordCount == 1:
                     # The first word of the paragraph is treated specially.
                     # The loop logic becomes trickier if all this code is
@@ -336,16 +331,13 @@ class ReflowState:
                         # currently check for this.
                         (addWord, closeLine, startLine) = (True, True, False)
                     elif newLen > self.margin:
-                        if firstBullet:
+                        if (
+                            firstBullet
+                            or not firstBullet
+                            and beginBullet.match(f'{word} ')
+                        ):
                             # If the word follows a bullet point, add it to
                             # the current line no matter its length.
-
-                            (addWord, closeLine, startLine) = (True, True, False)
-                        elif beginBullet.match(word + ' '):
-                            # If the word *is* a bullet point, add it to
-                            # the current line no matter its length.
-                            # This avoids an innocent inline '-' or '*'
-                            # turning into a bogus bullet point.
 
                             (addWord, closeLine, startLine) = (True, True, False)
                         else:
@@ -363,19 +355,15 @@ class ReflowState:
 
                         (addWord, closeLine, startLine) = (False, True, True)
 
-                    # Add a word to the current line
                     if addWord:
                         if outLine:
-                            outLine += ' ' + word
+                            outLine += f' {word}'
                             outLineLen = newLen
                         else:
                             # Fall through to startLine case if there is no
                             # current line yet.
                             startLine = True
 
-                    # Add current line to the output paragraph. Force
-                    # starting a new line, although we do not yet know if it
-                    # will ever have contents.
                     if closeLine:
                         if outLine:
                             outPara.append(outLine + '\n')
@@ -411,7 +399,10 @@ class ReflowState:
                     # Check for nested bullet points. These should not be
                     # assigned VUIDs, nor present at all, because they break
                     # the VU extractor.
-                    logWarn(self.filename + ': Invalid nested bullet point in VU block:', self.para[0])
+                    logWarn(
+                        f'{self.filename}: Invalid nested bullet point in VU block:',
+                        self.para[0],
+                    )
                 elif self.vuPrefix not in self.para[0]:
                     # If:
                     #   - a tag is not already present, and
@@ -444,11 +435,7 @@ class ReflowState:
                                     'No param name found for VUID tag on line:',
                                     self.para[0])
 
-                        newline = (head + ' [[' +
-                                   self.vuFormat.format(self.vuPrefix,
-                                                        self.apiName,
-                                                        paramName,
-                                                        self.nextvu) + ']] ' + tail)
+                        newline = f'{head} [[{self.vuFormat.format(self.vuPrefix, self.apiName, paramName, self.nextvu)}]] {tail}'
 
                         logDiag('Assigning', self.vuPrefix, self.apiName, self.nextvu,
                                 ' on line:', self.para[0], '->', newline, 'END')
@@ -459,12 +446,12 @@ class ReflowState:
                                 logWarn('Skipping VUID assignment, no more VUIDs available')
                             self.para[0] = newline
                             self.nextvu = self.nextvu + 1
-                # else:
-                #     There are only a few cases of this, and they are all
-                #     legitimate. Leave detecting this case to another tool
-                #     or hand inspection.
-                #     logWarn(self.filename + ': Unexpected non-bullet item in VU block (harmless if following an ifdef):',
-                #             self.para[0])
+                        # else:
+                        #     There are only a few cases of this, and they are all
+                        #     legitimate. Leave detecting this case to another tool
+                        #     or hand inspection.
+                        #     logWarn(self.filename + ': Unexpected non-bullet item in VU block (harmless if following an ifdef):',
+                        #             self.para[0])
 
             if self.reflowStack[-1]:
                 self.printLines(self.reflowPara())
@@ -673,18 +660,11 @@ def reflowFile(filename, args):
                 include_type = matches.group('category')
                 if generated_type == 'api' and include_type in ('protos', 'structs', 'funcpointers'):
                     apiName = matches.group('entity_name')
-                    if state.apiName != state.defaultApiName:
-                        # This happens when there are multiple API include
-                        # lines in a single block. The style guideline is to
-                        # always place the API which others are promoted to
-                        # first. In virtually all cases, the promoted API
-                        # will differ solely in the vendor suffix (or
-                        # absence of it), which is benign.
-                        if not apiMatch(state.apiName, apiName):
-                            logDiag(f'Promoted API name mismatch at line {state.lineNumber}: {apiName} does not match state.apiName (this is OK if it is just a spelling alias)')
-                    else:
+                    if state.apiName == state.defaultApiName:
                         state.apiName = apiName
 
+                    elif not apiMatch(state.apiName, apiName):
+                        logDiag(f'Promoted API name mismatch at line {state.lineNumber}: {apiName} does not match state.apiName (this is OK if it is just a spelling alias)')
         elif endParaContinue.match(line):
             # For now, always just end the paragraph.
             # Could check see if len(para) > 0 to accumulate.
@@ -692,7 +672,7 @@ def reflowFile(filename, args):
             state.endParaContinue(line)
 
             # If it is a title line, track that
-            if line[0:2] == '= ':
+            if line[:2] == '= ':
                 thisTitle = True
 
         elif blockPassthrough.match(line):
@@ -721,8 +701,9 @@ def reflowFile(filename, args):
                 and not beginBullet.match(line)
                 and conditionalStart.match(lines[state.lineNumber-2])):
 
-                logWarn('Detected embedded Valid Usage conditional: {}:{}'.format(
-                        filename, state.lineNumber - 1))
+                logWarn(
+                    f'Detected embedded Valid Usage conditional: {filename}:{state.lineNumber - 1}'
+                )
                 # Keep track of warning check count
                 args.warnCount = args.warnCount + 1
 
@@ -753,12 +734,12 @@ def reflowAllAdocFiles(folder_to_reflow, args):
                 reflowFile(file_path, args)
         for subdir in subdirs:
             sub_folder = os.path.join(root, subdir)
-            print('Sub-folder = %s' % sub_folder)
+            print(f'Sub-folder = {sub_folder}')
             if subdir.lower() not in conventions.spec_no_reflow_dirs:
-                print('   Parsing = %s' % sub_folder)
+                print(f'   Parsing = {sub_folder}')
                 reflowAllAdocFiles(sub_folder, args)
             else:
-                print('   Skipping = %s' % sub_folder)
+                print(f'   Skipping = {sub_folder}')
 
 # Patterns used to recognize interesting lines in an asciidoc source file.
 # These patterns are only compiled once.
@@ -883,9 +864,9 @@ if __name__ == '__main__':
         for vuid in sorted(args.vuidDict):
             found = args.vuidDict[vuid]
             if len(found) > 1:
-                logWarn('Duplicate VUID number {} found in files:'.format(vuid))
+                logWarn(f'Duplicate VUID number {vuid} found in files:')
                 for (file, line) in found:
-                    logWarn('    {}: {}'.format(file, line))
+                    logWarn(f'    {file}: {line}')
                 dupVUIDs = dupVUIDs + 1
 
         if dupVUIDs > 0:
@@ -902,19 +883,16 @@ if __name__ == '__main__':
         try:
             reflow_count_file_path = os.path.dirname(os.path.realpath(__file__))
             reflow_count_file_path += '/vuidCounts.py'
-            reflow_count_file = open(reflow_count_file_path, 'w', encoding='utf8')
-            print('# Do not edit this file!', file=reflow_count_file)
-            print('# VUID ranges reserved for branches', file=reflow_count_file)
-            print('# Key is branch name, value is [ start, end, nextfree ]', file=reflow_count_file)
-            print('vuidCounts = {', file=reflow_count_file)
-            for key in sorted(vuidCounts):
-                print("    '{}': [ {}, {}, {} ],".format(
-                    key,
-                    vuidCounts[key][0],
-                    vuidCounts[key][1],
-                    vuidCounts[key][2]),
-                    file=reflow_count_file)
-            print('}', file=reflow_count_file)
-            reflow_count_file.close()
+            with open(reflow_count_file_path, 'w', encoding='utf8') as reflow_count_file:
+                print('# Do not edit this file!', file=reflow_count_file)
+                print('# VUID ranges reserved for branches', file=reflow_count_file)
+                print('# Key is branch name, value is [ start, end, nextfree ]', file=reflow_count_file)
+                print('vuidCounts = {', file=reflow_count_file)
+                for key in sorted(vuidCounts):
+                    print(
+                        f"    '{key}': [ {vuidCounts[key][0]}, {vuidCounts[key][1]}, {vuidCounts[key][2]} ],",
+                        file=reflow_count_file,
+                    )
+                print('}', file=reflow_count_file)
         except:
             logWarn('Cannot open output count file vuidCounts.py', ':', sys.exc_info()[0])

@@ -14,7 +14,7 @@ CWD = Path.cwd()
 
 def move(src, dest):
 
-    print(str(src), '->', str(dest))
+    print(src, '->', dest)
     src.replace(dest)
 
 
@@ -28,11 +28,10 @@ if __name__ == "__main__":
 
     for platform, uwp in product(PLATFORMS, TRUE_FALSE):
         # ARM/ARM64 is only built for the UWP platform.
-        if not uwp and (platform.lower() == 'arm' or platform.lower() == 'arm64'):
+        if not uwp and platform.lower() in ['arm', 'arm64']:
             continue
 
-        platform_dirname = '{}{}'.format(platform,
-                                         '_uwp' if uwp else '')
+        platform_dirname = f"{platform}{'_uwp' if uwp else ''}"
 
         name = make_win_artifact_name(platform, uwp)
 

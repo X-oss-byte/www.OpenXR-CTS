@@ -13,23 +13,31 @@ import re
 
 # Type categories that respond "False" to isStructAlwaysValid
 # basetype is home to typedefs like ..Bool32
-CATEGORIES_REQUIRING_VALIDATION = set(('handle',
-                                       'enum',
-                                       'bitmask',
-                                       'basetype',
-                                       None))
+CATEGORIES_REQUIRING_VALIDATION = {
+    'handle',
+    'enum',
+    'bitmask',
+    'basetype',
+    None,
+}
 
 # These are basic C types pulled in via openxr_platform_defines.h
-TYPES_KNOWN_ALWAYS_VALID = set(('char',
-                                'float',
-                                'int8_t', 'uint8_t',
-                                'int16_t', 'uint16_t',
-                                'int32_t', 'uint32_t',
-                                'int64_t', 'uint64_t',
-                                'size_t',
-                                'intptr_t', 'uintptr_t',
-                                'int',
-                                ))
+TYPES_KNOWN_ALWAYS_VALID = {
+    'char',
+    'float',
+    'int8_t',
+    'uint8_t',
+    'int16_t',
+    'uint16_t',
+    'int32_t',
+    'uint32_t',
+    'int64_t',
+    'uint64_t',
+    'size_t',
+    'intptr_t',
+    'uintptr_t',
+    'int',
+}
 
 # Split an extension name into vendor ID and name portions
 EXT_NAME_DECOMPOSE_RE = re.compile(r'[A-Z]+_(?P<vendor>[A-Z]+)_(?P<name>[\w_]+)')
@@ -47,7 +55,7 @@ class ProseListFormats(Enum):
             return cls.OR
         if s == 'and':
             return cls.AND
-        raise RuntimeError("Unrecognized string connective: " + s)
+        raise RuntimeError(f"Unrecognized string connective: {s}")
 
     @property
     def connective(self):
@@ -77,7 +85,7 @@ class ConventionsBase(abc.ABC):
 
     def formatExtension(self, name):
         """Mark up an extension name as a link the spec."""
-        return 'apiext:{}'.format(name)
+        return f'apiext:{name}'
 
     @property
     @abc.abstractmethod
@@ -185,7 +193,7 @@ class ConventionsBase(abc.ABC):
 
         my_elts = list(elements)
         if len(my_elts) > 1:
-            my_elts[-1] = '{} {}'.format(fmt.connective, my_elts[-1])
+            my_elts[-1] = f'{fmt.connective} {my_elts[-1]}'
 
         if not comma_for_two_elts and len(my_elts) <= 2:
             prose = ' '.join(my_elts)
@@ -242,7 +250,8 @@ class ConventionsBase(abc.ABC):
         Implemented in terms of command_prefix (and in turn, api_prefix)."""
         if not self._type_prefix:
             self._type_prefix = ''.join(
-                (self.command_prefix[0:1].upper(), self.command_prefix[1:]))
+                (self.command_prefix[:1].upper(), self.command_prefix[1:])
+            )
         return self._type_prefix
 
     @property
@@ -262,7 +271,7 @@ class ConventionsBase(abc.ABC):
         Implemented in terms of api_prefix.
 
         May override."""
-        return self.api_prefix + 'VERSION_'
+        return f'{self.api_prefix}VERSION_'
 
     @property
     def KHR_prefix(self):
@@ -271,7 +280,7 @@ class ConventionsBase(abc.ABC):
         Implemented in terms of api_prefix.
 
         May override."""
-        return self.api_prefix + 'KHR_'
+        return f'{self.api_prefix}KHR_'
 
     @property
     def EXT_prefix(self):
@@ -280,7 +289,7 @@ class ConventionsBase(abc.ABC):
         Implemented in terms of api_prefix.
 
         May override."""
-        return self.api_prefix + 'EXT_'
+        return f'{self.api_prefix}EXT_'
 
     def writeFeature(self, featureExtraProtect, filename):
         """Return True if OutputGenerator.endFeature should write this feature.

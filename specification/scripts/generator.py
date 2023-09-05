@@ -35,19 +35,14 @@ def noneStr(s):
 
     Used in converting etree Elements into text.
     s - string to convert"""
-    if s:
-        return s
-    return ""
+    return s if s else ""
 
 
 def enquote(s):
     """Return string argument with surrounding quotes,
       for serialization into Python code."""
     if s:
-        if isinstance(s, str):
-            return f"'{s}'"
-        else:
-            return s
+        return f"'{s}'" if isinstance(s, str) else s
     return None
 
 
@@ -61,16 +56,8 @@ def regSortCategoryKey(feature):
     - other       (EXT/vendor extensions)"""
 
     if feature.elem.tag == 'feature':
-        if feature.name.startswith('VKSC'):
-            return 0.5
-        else:
-            return 0
-    if (feature.category == 'ARB'
-        or feature.category == 'KHR'
-            or feature.category == 'OES'):
-        return 1
-
-    return 2
+        return 0.5 if feature.name.startswith('VKSC') else 0
+    return 1 if feature.category in ['ARB', 'KHR', 'OES'] else 2
 
 
 def regSortOrderKey(feature):
@@ -118,7 +105,7 @@ class MissingGeneratorOptionsError(RuntimeError):
     def __init__(self, msg=None):
         full_msg = 'Missing generator options object self.genOpts'
         if msg:
-            full_msg += ': ' + msg
+            full_msg += f': {msg}'
         super().__init__(full_msg)
 
 
@@ -128,7 +115,7 @@ class MissingRegistryError(RuntimeError):
     def __init__(self, msg=None):
         full_msg = 'Missing Registry object self.registry'
         if msg:
-            full_msg += ': ' + msg
+            full_msg += f': {msg}'
         super().__init__(full_msg)
 
 
@@ -138,7 +125,7 @@ class MissingGeneratorOptionsConventionsError(RuntimeError):
     def __init__(self, msg=None):
         full_msg = 'Missing Conventions object self.genOpts.conventions'
         if msg:
-            full_msg += ': ' + msg
+            full_msg += f': {msg}'
         super().__init__(full_msg)
 
 
@@ -313,10 +300,7 @@ class GeneratorOptions:
     def emptyRegex(self, pat):
         """Substitute a regular expression which matches no version
         or extension names for None or the empty string."""
-        if not pat:
-            return '_nomatch_^'
-
-        return pat
+        return '_nomatch_^' if not pat else pat
 
 
 class OutputGenerator:
@@ -344,8 +328,8 @@ class OutputGenerator:
         bad = (
         )
 
-        if name in bad and True:
-            print('breakName {}: {}'.format(name, msg))
+        if name in bad:
+            print(f'breakName {name}: {msg}')
             pdb.set_trace()
 
     def __init__(self, errFile=sys.stderr, warnFile=sys.stderr, diagFile=sys.stdout):
@@ -403,7 +387,8 @@ class OutputGenerator:
                 write('DIAG:', *args, file=self.diagFile)
         else:
             raise UserWarning(
-                '*** FATAL ERROR in Generator.logMsg: unknown level:' + level)
+                f'*** FATAL ERROR in Generator.logMsg: unknown level:{level}'
+            )
 
     def enumToValue(self, elem, needsNum, bitwidth = 32,
                     forceSuffix = False, parent_for_alias_dereference=None):
@@ -455,10 +440,7 @@ class OutputGenerator:
             # if t is not None and t != '' and t != 'i' and t != 's':
             #     value += enuminfo.type
             if forceSuffix:
-              if bitwidth == 64:
-                value = value + 'ULL'
-              else:
-                value = value + 'U'
+                value = f'{value}ULL' if bitwidth == 64 else f'{value}U'
             self.logMsg('diag', 'Enum', name, '-> value [', numVal, ',', value, ']')
             return [numVal, value]
         if 'bitpos' in elem.keys():
@@ -467,19 +449,16 @@ class OutputGenerator:
             numVal = 1 << bitpos
             value = '0x%08x' % numVal
             if bitwidth == 64 or bitpos >= 32:
-              value = value + 'ULL'
+                value = f'{value}ULL'
             elif forceSuffix:
-              value = value + 'U'
+                value = f'{value}U'
             self.logMsg('diag', 'Enum', name, '-> bitpos [', numVal, ',', value, ']')
             return [numVal, value]
         if 'offset' in elem.keys():
-            # Obtain values in the mapping from the attributes
-            enumNegative = False
             offset = int(elem.get('offset'), 0)
             extnumber = int(elem.get('extnumber'), 0)
             extends = elem.get('extends')
-            if 'dir' in elem.keys():
-                enumNegative = True
+            enumNegative = 'dir' in elem.keys()
             self.logMsg('diag', 'Enum', name, 'offset =', offset,
                         'extnumber =', extnumber, 'extends =', extends,
                         'enumNegative =', enumNegative)
@@ -534,9 +513,10 @@ class OutputGenerator:
                     # self.logMsg('info', 'checkDuplicateEnums: Duplicate enum (' + name +
                     #             ') found with the same value:' + strVal)
                 else:
-                    self.logMsg('warn', 'checkDuplicateEnums: Duplicate enum (' + name
-                                + ') found with different values:' + strVal
-                                + ' and ' + strVal2)
+                    self.logMsg(
+                        'warn',
+                        f'checkDuplicateEnums: Duplicate enum ({name}) found with different values:{strVal} and {strVal2}',
+                    )
 
                 # Do not add the duplicate to the returned list
                 continue
@@ -545,8 +525,7 @@ class OutputGenerator:
                 # still add this enum to the list.
                 (name2, numVal2, strVal2) = valueMap[numVal]
 
-                msg = 'Two enums found with the same value: {} = {} = {}'.format(
-                    name, name2.get('name'), strVal)
+                msg = f"Two enums found with the same value: {name} = {name2.get('name')} = {strVal}"
                 self.logMsg('error', msg)
 
             # Track this enum to detect followon duplicates
@@ -587,7 +566,7 @@ class OutputGenerator:
         flagTypeName = groupinfo.flagType.elem.get('name')
 
         # Prefix
-        body = "// Flag bits for " + flagTypeName + "\n"
+        body = f"// Flag bits for {flagTypeName}" + "\n"
 
         # Loop over the nested 'enum' tags.
         for elem in groupElem.findall('enum'):
@@ -597,9 +576,9 @@ class OutputGenerator:
             (_, strVal) = self.enumToValue(elem, True, parent_for_alias_dereference=groupElem)
             alias_of = elem.get('alias')
             name = elem.get('name')
-            body += "static const {} {} = {};".format(flagTypeName, name, strVal)
+            body += f"static const {flagTypeName} {name} = {strVal};"
             if alias_of is not None:
-                body += "  // alias of {}".format(alias_of)
+                body += f"  // alias of {alias_of}"
             body += "\n"
 
         # Postfix
@@ -615,8 +594,7 @@ class OutputGenerator:
         expandName = re.sub(r'([0-9]+|[a-z_])([A-Z0-9])', r'\1_\2', groupName).upper()
         expandPrefix = expandName
         expandSuffix = ''
-        expandSuffixMatch = re.search(r'[A-Z][A-Z]+$', groupName)
-        if expandSuffixMatch:
+        if expandSuffixMatch := re.search(r'[A-Z][A-Z]+$', groupName):
             expandSuffix = '_' + expandSuffixMatch.group()
             # Strip off the suffix from the prefix
             expandPrefix = expandName.rsplit(expandSuffix, 1)[0]
@@ -666,14 +644,14 @@ class OutputGenerator:
 
                 protect = elem.get('protect')
                 if protect is not None:
-                    decl += '#ifdef {}\n'.format(protect)
+                    decl += f'#ifdef {protect}\n'
 
                 # Indent requirements comment, if there is one
                 requirements = self.genRequirements(name, mustBeFound = False)
                 if requirements != '':
                     requirements = '  ' + requirements
                 decl += requirements
-                decl += '    {} = {},'.format(name, strVal)
+                decl += f'    {name} = {strVal},'
 
                 if protect is not None:
                     decl += '\n#endif'
@@ -719,11 +697,7 @@ class OutputGenerator:
         body.append("} %s;" % groupName)
 
         # Determine appropriate section for this declaration
-        if groupElem.get('type') == 'bitmask':
-            section = 'bitmask'
-        else:
-            section = 'group'
-
+        section = 'bitmask' if groupElem.get('type') == 'bitmask' else 'group'
         return (section, '\n'.join(body))
 
     def buildConstantCDecl(self, enuminfo, name, alias):
@@ -744,8 +718,13 @@ class OutputGenerator:
             if typeStr != "float":
                 number += 'U'
             strVal = "~" if invert else ""
-            strVal += "static_cast<" + typeStr + ">(" + number + ")"
-            body = 'static constexpr ' + typeStr.ljust(9) + name.ljust(33) + ' {' + strVal + '};'
+            strVal += f"static_cast<{typeStr}>({number})"
+            return (
+                f'static constexpr {typeStr.ljust(9)}{name.ljust(33)}'
+                + ' {'
+                + strVal
+                + '};'
+            )
         elif enuminfo.elem.get('type') and not alias:
             # Generate e.g.: #define x (~0ULL)
             typeStr = enuminfo.elem.get('type');
@@ -753,15 +732,12 @@ class OutputGenerator:
             paren = '(' in strVal
             number = strVal.strip("()~UL")
             if typeStr != "float":
-                if typeStr == "uint64_t":
-                    number += 'ULL'
-                else:
-                    number += 'U'
+                number += 'ULL' if typeStr == "uint64_t" else 'U'
             strVal = "~" if invert else ""
             strVal += number
             if paren:
-                strVal = "(" + strVal + ")";
-            body = '#define ' + name.ljust(33) + ' ' + strVal;
+                strVal = f"({strVal})";
+            return f'#define {name.ljust(33)} {strVal}';
         elif self.genOpts.redefineEnumExtends and enuminfo.elem.get('extends'):
             # <enum> tags with an extends field is usually
             # absorbed into the actual enum definition
@@ -777,19 +753,17 @@ class OutputGenerator:
             strVal = "~" if invert else ""
             strVal += number
             if paren:
-                strVal = "(" + strVal + ")"
-            strVal = "((" + typeStr + ") "+ strVal + ")"
-            body = '#define ' + name.ljust(33) + ' ' + strVal
+                strVal = f"({strVal})"
+            strVal = f"(({typeStr}) {strVal})"
+            return f'#define {name.ljust(33)} {strVal}'
         else:
-            body = '#define ' + name.ljust(33) + ' ' + strVal
-
-        return body
+            return f'#define {name.ljust(33)} {strVal}'
 
     def makeDir(self, path: Path):
         """Create a directory, if not already done.
 
         Generally called from derived generators creating hierarchies."""
-        self.logMsg('diag', 'OutputGenerator::makeDir(' + str(path) + ')')
+        self.logMsg('diag', f'OutputGenerator::makeDir({str(path)})')
         if path not in self.madeDirs:
             # This can get race conditions with multiple writers, see
             # https://stackoverflow.com/questions/273192/
@@ -838,7 +812,7 @@ class OutputGenerator:
             self.diagFile.flush()
         if self.outFile:
             self.outFile.flush()
-            if self.outFile != sys.stdout and self.outFile != sys.stderr:
+            if self.outFile not in [sys.stdout, sys.stderr]:
                 self.outFile.close()
 
             if self.genOpts is None:
@@ -848,8 +822,8 @@ class OutputGenerator:
             # target file.
             if self.genOpts.filename is not None:
                 directory = Path(self.genOpts.directory)
-                if sys.platform == 'win32':
-                    if not Path.exists(directory):
+                if not Path.exists(directory):
+                    if sys.platform == 'win32':
                         os.makedirs(directory)
                 shutil.copy(self.outFile.name, directory / self.genOpts.filename)
                 os.remove(self.outFile.name)
@@ -971,7 +945,7 @@ class OutputGenerator:
         """Make the function-pointer typedef name for a command."""
         if self.genOpts is None:
             raise MissingGeneratorOptionsError()
-        return '(' + self.genOpts.apientryp + 'PFN_' + name + tail + ')'
+        return f'({self.genOpts.apientryp}PFN_{name}{tail})'
 
     def makeCParamDecl(self, param, aligncol):
         """Return a string which is an indented, formatted
@@ -1004,7 +978,7 @@ class OutputGenerator:
                 # This works around a problem where very long type names -
                 # longer than the alignment column - would run into the tail
                 # text.
-                paramdecl = paramdecl.ljust(aligncol - 1) + ' '
+                paramdecl = f'{paramdecl.ljust(aligncol - 1)} '
                 newLen = len(paramdecl)
                 self.logMsg('diag', 'Adjust length of parameter decl from', oldLen, 'to', newLen, ':', paramdecl)
 
@@ -1038,7 +1012,7 @@ class OutputGenerator:
 
         # Allow for missing <name> tag
         newLen = 0
-        paramdecl = '    ' + noneStr(param.text)
+        paramdecl = f'    {noneStr(param.text)}'
         for elem in param:
             text = noneStr(elem.text)
             tail = noneStr(elem.tail)
@@ -1073,10 +1047,7 @@ class OutputGenerator:
             return None
 
         elem = info.elem
-        if elem is not None:
-            return elem.get('parent')
-
-        return None
+        return elem.get('parent') if elem is not None else None
 
     def iterateHandleAncestors(self, typename):
         """Iterate through the ancestors of a handle type."""
@@ -1099,9 +1070,7 @@ class OutputGenerator:
             return None
 
         elem = info.elem
-        if elem is not None:
-            return elem.get('category')
-        return None
+        return elem.get('category') if elem is not None else None
 
     def isStructAlwaysValid(self, structname):
         """Try to do check if a structure is always considered valid (i.e. there is no rules to its acceptance)."""
@@ -1175,26 +1144,6 @@ class OutputGenerator:
         required = elem.get('required') is not None
         self.logMsg('diag', 'isEnumRequired:', elem.get('name'),
                     '->', required)
-        return required
-
-        # @@@ This code is overridden by equivalent code now run in
-        # @@@ Registry.generateFeature
-
-        required = False
-
-        extname = elem.get('extname')
-        if extname is not None:
-            # 'supported' attribute was injected when the <enum> element was
-            # moved into the <enums> group in Registry.parseTree()
-            if self.genOpts.defaultExtensions == elem.get('supported'):
-                required = True
-            elif re.match(self.genOpts.addExtensions, extname) is not None:
-                required = True
-        elif elem.get('version') is not None:
-            required = re.match(self.genOpts.emitversions, elem.get('version')) is not None
-        else:
-            required = True
-
         return required
 
     def makeCDecls(self, cmd):

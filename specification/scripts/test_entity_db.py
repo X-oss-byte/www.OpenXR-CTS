@@ -14,9 +14,7 @@ from check_spec_links import XREntityDatabase
 
 @pytest.fixture
 def db():
-    ret = XREntityDatabase()
-    # print(ret.getEntityJson())
-    return ret
+    return XREntityDatabase()
 
 
 def test_likely_recognized(db):

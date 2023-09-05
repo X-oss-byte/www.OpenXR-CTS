@@ -245,14 +245,15 @@ class COutputGenerator(OutputGenerator):
 
     def endFeature(self):
         "Actually write the interface to the output file."
-        # C-specific
         if self.emit:
             if self.feature_not_empty:
                 if self.genOpts is None:
                     raise MissingGeneratorOptionsError()
                 if self.genOpts.conventions is None:
                     raise MissingGeneratorOptionsConventionsError()
-                is_core = self.featureName and self.featureName.startswith(self.conventions.api_prefix + 'VERSION_')
+                is_core = self.featureName and self.featureName.startswith(
+                    f'{self.conventions.api_prefix}VERSION_'
+                )
                 if self.genOpts.conventions.writeFeature(self.featureExtraProtect, self.genOpts.filename):
                     self.newline()
                     if self.genOpts.protectFeature:
@@ -267,8 +268,7 @@ class COutputGenerator(OutputGenerator):
 
                     write('#define', self.featureName, '1', file=self.outFile)
                     for section in self.TYPE_SECTIONS:
-                        contents = self.sections[section]
-                        if contents:
+                        if contents := self.sections[section]:
                             write('\n'.join(contents), file=self.outFile)
 
                     if self.genOpts.genFuncPointers and self.sections['commandPointer']:
@@ -330,11 +330,7 @@ class COutputGenerator(OutputGenerator):
         # internal issue #877, since structures and function pointer types
         # can have cross-dependencies.
         category = typeElem.get('category')
-        if category == 'funcpointer':
-            section = 'struct'
-        else:
-            section = category
-
+        section = 'struct' if category == 'funcpointer' else category
         if category in ('struct', 'union'):
             # If the type is a struct type, generate it using the
             # special-purpose generator.
@@ -345,7 +341,7 @@ class COutputGenerator(OutputGenerator):
             # OpenXR: this section was not under 'else:' previously, just fell through
             if alias:
                 # If the type is an alias, just emit a typedef declaration
-                body = 'typedef ' + alias + ' ' + name + ';\n'
+                body = f'typedef {alias} {name}' + ';\n'
             else:
                 # Replace <apientry /> tags with an APIENTRY-style string
                 # (from self.genOpts). Copy other text through unchanged.
@@ -358,7 +354,7 @@ class COutputGenerator(OutputGenerator):
                         body += noneStr(elem.text) + noneStr(elem.tail)
             if body:
                 # Add extra newline after multi-line entries.
-                if '\n' in body[0:-1]:
+                if '\n' in body[:-1]:
                     body += '\n'
                 self.appendSection(section, body)
 
@@ -376,7 +372,7 @@ class COutputGenerator(OutputGenerator):
 
         if ',' in protect_str:
             protect_list = protect_str.split(',')
-            protect_defs = ('defined(%s)' % d for d in protect_list)
+            protect_defs = (f'defined({d})' for d in protect_list)
             protect_def_str = ' && '.join(protect_defs)
             protect_if_str = '#if %s\n' % protect_def_str
             protect_end_str = '#endif // %s\n' % protect_def_str
@@ -394,15 +390,16 @@ class COutputGenerator(OutputGenerator):
             # So, populate the set of all names of types that may.
 
             # Everyone with an explicit mayalias="true"
-            self.may_alias = set(typeName
-                                 for typeName, data in self.registry.typedict.items()
-                                 if data.elem.get('mayalias') == 'true')
+            self.may_alias = {
+                typeName
+                for typeName, data in self.registry.typedict.items()
+                if data.elem.get('mayalias') == 'true'
+            }
 
             # Every type mentioned in some other type's parentstruct attribute.
             polymorphic_bases = (otherType.elem.get('parentstruct')
                                  for otherType in self.registry.typedict.values())
-            self.may_alias.update(set(x for x in polymorphic_bases
-                                      if x is not None))
+            self.may_alias.update({x for x in polymorphic_bases if x is not None})
         return typeName in self.may_alias
 
     def genStruct(self, typeinfo, typeName, alias):
@@ -425,7 +422,7 @@ class COutputGenerator(OutputGenerator):
         typeElem = typeinfo.elem
 
         if alias:
-            body = 'typedef ' + alias + ' ' + typeName + ';\n'
+            body = f'typedef {alias} {typeName}' + ';\n'
         else:
             body = ''
             (protect_begin, protect_end) = self.genProtectString(typeElem.get('protect'))
@@ -434,7 +431,11 @@ class COutputGenerator(OutputGenerator):
 
             if self.genOpts.genStructExtendsComment:
                 structextends = typeElem.get('structextends')
-                body += '// ' + typeName + ' extends ' + structextends + '\n' if structextends else ''
+                body += (
+                    f'// {typeName} extends {structextends}' + '\n'
+                    if structextends
+                    else ''
+                )
 
             body += 'typedef ' + typeElem.get('category')
 
@@ -442,9 +443,9 @@ class COutputGenerator(OutputGenerator):
             # to an inheritance hierarchy of types rather than C-level type
             # aliases.
             if self.genOpts.genAliasMacro and self.typeMayAlias(typeName):
-                body += ' ' + self.genOpts.aliasMacro
+                body += f' {self.genOpts.aliasMacro}'
 
-            body += ' ' + typeName + ' {\n'
+            body += f' {typeName}' + ' {\n'
 
             targetLen = self.getMaxCParamTypeLength(typeinfo)
             for member in typeElem.findall('.//member'):
@@ -468,15 +469,11 @@ class COutputGenerator(OutputGenerator):
 
         # After either enumerated type or alias paths, add the declaration
         # to the appropriate section for the group being defined.
-        if groupElem.get('type') == 'bitmask':
-            section = 'bitmask'
-        else:
-            section = 'group'
-
+        section = 'bitmask' if groupElem.get('type') == 'bitmask' else 'group'
         if alias:
             # If the group name is aliased, just emit a typedef declaration
             # for the alias.
-            body = 'typedef ' + alias + ' ' + groupName + ';\n'
+            body = f'typedef {alias} {groupName}' + ';\n'
             self.appendSection(section, body)
         else:
             if self.genOpts is None:
@@ -506,9 +503,8 @@ class COutputGenerator(OutputGenerator):
         if self.genOpts is None:
             raise MissingGeneratorOptionsError()
 
-        prefix = ''
         decls = self.makeCDecls(cmdinfo.elem)
-        self.appendSection('command', prefix + decls[0] + '\n')
+        self.appendSection('command', f'{decls[0]}' + '\n')
         if self.genOpts.genFuncPointers:
             self.appendSection('commandPointer', decls[1])
 

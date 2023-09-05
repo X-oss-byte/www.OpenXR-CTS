@@ -46,10 +46,7 @@ def makeExtensionInclude(name):
     """Return an include command for a generated extension interface.
        - name - extension name"""
 
-    return 'include::{}/meta/refpage.{}{}[]'.format(
-            conventions.generated_include_path,
-            name,
-            conventions.file_suffix)
+    return f'include::{conventions.generated_include_path}/meta/refpage.{name}{conventions.file_suffix}[]'
 
 
 def makeAPIInclude(type, name):
@@ -57,9 +54,7 @@ def makeAPIInclude(type, name):
        - type - type of the API, e.g. 'flags', 'handles', etc
        - name - name of the API"""
 
-    return 'include::{}/api/{}/{}{}\n'.format(
-            conventions.generated_include_path,
-            type, name, conventions.file_suffix)
+    return f'include::{conventions.generated_include_path}/api/{type}/{name}{conventions.file_suffix}\n'
 
 
 def isextension(name):
@@ -116,24 +111,24 @@ def macroPrefix(name):
 
     If the name is not recognized, use the generic link macro 'reflink:'."""
     if name in api.basetypes:
-        return 'basetype:' + name
+        return f'basetype:{name}'
     if name in api.defines:
-        return 'dlink:' + name
+        return f'dlink:{name}'
     if name in api.enums:
-        return 'elink:' + name
+        return f'elink:{name}'
     if name in api.flags:
-        return 'elink:' + name
+        return f'elink:{name}'
     if name in api.funcpointers:
-        return 'tlink:' + name
+        return f'tlink:{name}'
     if name in api.handles:
-        return 'slink:' + name
+        return f'slink:{name}'
     if name in api.protos:
-        return 'flink:' + name
+        return f'flink:{name}'
     if name in api.structs:
-        return 'slink:' + name
+        return f'slink:{name}'
     if name == 'TBD':
         return 'No cross-references are available'
-    return 'reflink:' + name
+    return f'reflink:{name}'
 
 
 def seeAlsoList(apiName, explicitRefs=None, apiAliases=[]):
@@ -162,7 +157,7 @@ def seeAlsoList(apiName, explicitRefs=None, apiAliases=[]):
     if explicitRefs is not None:
         if isinstance(explicitRefs, str):
             explicitRefs = explicitRefs.split()
-        refs.update(name for name in explicitRefs)
+        refs.update(iter(explicitRefs))
 
     # Add extensions / core versions based on dependencies
     for name in allApis:
@@ -172,7 +167,7 @@ def seeAlsoList(apiName, explicitRefs=None, apiAliases=[]):
                 if dependency is not None:
                     refs.add(dependency)
 
-    if len(refs) == 0:
+    if not refs:
         return None
     else:
         return ', '.join(macroPrefix(name) for name in sorted(refs)) + '\n'
@@ -198,10 +193,10 @@ def remapIncludes(lines, baseDir, specDir):
 
             if path[0] != '{':
                 # Relative path to include file from here
-                incPath = specDir + '/' + path
+                incPath = f'{specDir}/{path}'
                 # Remap to be relative to baseDir
                 newPath = os.path.relpath(incPath, baseDir)
-                newLine = 'include::' + newPath + '[]\n'
+                newLine = f'include::{newPath}' + '[]\n'
                 logDiag('remapIncludes: remapping', line, '->', newLine)
                 newLines.append(newLine)
             else:
@@ -232,18 +227,13 @@ def refPageShell(pageName, pageDesc, fp, head_content = None, sections=None, tai
           '',
           sep='\n', file=fp)
 
-    s = '{}({})'.format(pageName, man_section)
-    print('= ' + s,
-          '',
-          sep='\n', file=fp)
+    s = f'{pageName}({man_section})'
+    print(f'= {s}', '', sep='\n', file=fp)
     if pageDesc.strip() == '':
         pageDesc = 'NO SHORT DESCRIPTION PROVIDED'
         logWarn('refPageHead: no short description provided for', pageName)
 
-    print('== Name',
-          '{} - {}'.format(pageName, pageDesc),
-          '',
-          sep='\n', file=fp)
+    print('== Name', f'{pageName} - {pageDesc}', '', sep='\n', file=fp)
 
     if head_content is not None:
         print(head_content,
@@ -252,11 +242,7 @@ def refPageShell(pageName, pageDesc, fp, head_content = None, sections=None, tai
 
     if sections is not None:
         for title, content in sections.items():
-            print('== {}'.format(title),
-                  '',
-                  content,
-                  '',
-                  sep='\n', file=fp)
+            print(f'== {title}', '', content, '', sep='\n', file=fp)
 
     if tail_content is not None:
         print(tail_content,
@@ -323,8 +309,7 @@ def refPageTail(pageName,
         seeAlso = 'No cross-references are available\n'
 
     notes = [
-        'For more information, see the {}#{}[{} Specification^]'.format(
-            specURL, specAnchor, specName),
+        f'For more information, see the {specURL}#{specAnchor}[{specName} Specification^]',
         '',
     ]
 
@@ -335,11 +320,13 @@ def refPageTail(pageName,
             'not directly.',
         ))
     else:
-        notes.extend((
-            'This page is extracted from the ' + specName + ' Specification. ',
-            'Fixes and changes should be made to the Specification, '
-            'not directly.',
-        ))
+        notes.extend(
+            (
+                f'This page is extracted from the {specName} Specification. ',
+                'Fixes and changes should be made to the Specification, '
+                'not directly.',
+            )
+        )
 
     # Generate the section header.
     # Default depth is 2.
@@ -400,7 +387,7 @@ def xrefRewrite(text, specURL):
     global refLinkTextPattern, refLinkTextSubstitute
     global specLinkPattern, specLinkSubstitute
 
-    specLinkSubstitute = r'link:{}#\1[\2^]'.format(specURL)
+    specLinkSubstitute = f'link:{specURL}#\1[\2^]'
 
     if text is not None:
         text, _ = refLinkPattern.subn(refLinkSubstitute, text)
@@ -416,7 +403,7 @@ def emitPage(baseDir, specDir, pi, file):
     - specDir - directory extracted page source came from
     - pi - pageInfo for this page relative to file
     - file - list of strings making up the file, indexed by pi"""
-    pageName = baseDir + '/' + pi.name + '.txt'
+    pageName = f'{baseDir}/{pi.name}.txt'
 
     # Add a dictionary entry for this page
     global genDict
@@ -475,20 +462,19 @@ def emitPage(baseDir, specDir, pi, file):
     fieldText = xrefRewrite(fieldText, specURL)
     descText = xrefRewrite(descText, specURL)
 
-    fp = open(pageName, 'w', encoding='utf-8')
-    refPageHead(pi.name,
-                pi.desc,
-                specText,
-                field, fieldText,
-                descText,
-                fp)
-    refPageTail(pageName=pi.name,
-                specType=pi.spec,
-                specAnchor=pi.anchor,
-                seeAlso=seeAlsoList(pi.name, pi.refs, pi.alias.split()),
-                fp=fp,
-                auto=False)
-    fp.close()
+    with open(pageName, 'w', encoding='utf-8') as fp:
+        refPageHead(pi.name,
+                    pi.desc,
+                    specText,
+                    field, fieldText,
+                    descText,
+                    fp)
+        refPageTail(pageName=pi.name,
+                    specType=pi.spec,
+                    specAnchor=pi.anchor,
+                    seeAlso=seeAlsoList(pi.name, pi.refs, pi.alias.split()),
+                    fp=fp,
+                    auto=False)
 
 
 def autoGenEnumsPage(baseDir, pi, file):
@@ -499,47 +485,48 @@ def autoGenEnumsPage(baseDir, pi, file):
     - baseDir - base directory to emit page into
     - pi - pageInfo for this page relative to file
     - file - list of strings making up the file, indexed by pi"""
-    pageName = baseDir + '/' + pi.name + '.txt'
-    fp = open(pageName, 'w', encoding='utf-8')
+    pageName = f'{baseDir}/{pi.name}.txt'
+    with open(pageName, 'w', encoding='utf-8') as fp:
+        # Add a dictionary entry for this page
+        global genDict
+        genDict[pi.name] = None
+        logDiag('autoGenEnumsPage:', pageName)
 
-    # Add a dictionary entry for this page
-    global genDict
-    genDict[pi.name] = None
-    logDiag('autoGenEnumsPage:', pageName)
+        # Short description
+        if pi.desc is None:
+            pi.desc = '(no short description available)'
 
-    # Short description
-    if pi.desc is None:
-        pi.desc = '(no short description available)'
+        # Description text. Allow for the case where an enum definition
+        # is not embedded.
+        if not pi.embed:
+            embedRef = ''
+        else:
+            embedRef = ''.join((
+                               '  * The reference page for ',
+                               macroPrefix(pi.embed),
+                               ', where this interface is defined.\n'))
 
-    # Description text. Allow for the case where an enum definition
-    # is not embedded.
-    if not pi.embed:
-        embedRef = ''
-    else:
-        embedRef = ''.join((
-                           '  * The reference page for ',
-                           macroPrefix(pi.embed),
-                           ', where this interface is defined.\n'))
+        txt = ''.join(
+            (
+                'For more information, see:\n\n',
+                embedRef,
+                '  * The See Also section for other reference pages using this type.\n',
+                f'  * The {apiName}' + ' Specification.\n',
+            )
+        )
 
-    txt = ''.join((
-        'For more information, see:\n\n',
-        embedRef,
-        '  * The See Also section for other reference pages using this type.\n',
-        '  * The ' + apiName + ' Specification.\n'))
-
-    refPageHead(pi.name,
-                pi.desc,
-                ''.join(file[pi.begin:pi.include + 1]),
-                None, None,
-                txt,
-                fp)
-    refPageTail(pageName=pi.name,
-                specType=pi.spec,
-                specAnchor=pi.anchor,
-                seeAlso=seeAlsoList(pi.name, pi.refs, pi.alias.split()),
-                fp=fp,
-                auto=True)
-    fp.close()
+        refPageHead(pi.name,
+                    pi.desc,
+                    ''.join(file[pi.begin:pi.include + 1]),
+                    None, None,
+                    txt,
+                    fp)
+        refPageTail(pageName=pi.name,
+                    specType=pi.spec,
+                    specAnchor=pi.anchor,
+                    seeAlso=seeAlsoList(pi.name, pi.refs, pi.alias.split()),
+                    fp=fp,
+                    auto=True)
 
 
 # Pattern to break apart an API *Flags{authorID} name, used in
@@ -552,52 +539,57 @@ def autoGenFlagsPage(baseDir, flagName):
 
     - baseDir - base directory to emit page into
     - flagName - API *Flags name"""
-    pageName = baseDir + '/' + flagName + '.txt'
-    fp = open(pageName, 'w', encoding='utf-8')
+    pageName = f'{baseDir}/{flagName}.txt'
+    with open(pageName, 'w', encoding='utf-8') as fp:
+        # Add a dictionary entry for this page
+        global genDict
+        genDict[flagName] = None
+        logDiag('autoGenFlagsPage:', pageName)
 
-    # Add a dictionary entry for this page
-    global genDict
-    genDict[flagName] = None
-    logDiag('autoGenFlagsPage:', pageName)
+        # Short description
+        matches = flagNamePat.search(flagName)
+        if matches is not None:
+            name = matches.group('name')
+            author = matches.group('author')
+            logDiag('autoGenFlagsPage: split name into', name, 'Flags', author)
+            flagBits = f'{name}FlagBits{author}'
+            desc = f'Bitmask of {flagBits}'
+        else:
+            logWarn('autoGenFlagsPage:', pageName, 'does not end in "Flags{author ID}". Cannot infer FlagBits type.')
+            flagBits = None
+            desc = f'Unknown {apiName} flags type'
 
-    # Short description
-    matches = flagNamePat.search(flagName)
-    if matches is not None:
-        name = matches.group('name')
-        author = matches.group('author')
-        logDiag('autoGenFlagsPage: split name into', name, 'Flags', author)
-        flagBits = name + 'FlagBits' + author
-        desc = 'Bitmask of ' + flagBits
-    else:
-        logWarn('autoGenFlagsPage:', pageName, 'does not end in "Flags{author ID}". Cannot infer FlagBits type.')
-        flagBits = None
-        desc = 'Unknown ' + apiName + ' flags type'
+            # Description text
+        if flagBits is not None:
+            txt = ''.join(
+                (
+                    f'etext:{flagName}',
+                    f' is a mask of zero or more elink:{flagBits}' + '.\n',
+                    'It is used as a member and/or parameter of the structures and commands\n',
+                    'in the See Also section below.\n',
+                )
+            )
+        else:
+            txt = ''.join(
+                (
+                    f'etext:{flagName}',
+                    f' is an unknown {apiName}'
+                    + ' type, assumed to be a bitmask.\n',
+                )
+            )
 
-    # Description text
-    if flagBits is not None:
-        txt = ''.join((
-            'etext:' + flagName,
-            ' is a mask of zero or more elink:' + flagBits + '.\n',
-            'It is used as a member and/or parameter of the structures and commands\n',
-            'in the See Also section below.\n'))
-    else:
-        txt = ''.join((
-            'etext:' + flagName,
-            ' is an unknown ' + apiName + ' type, assumed to be a bitmask.\n'))
-
-    refPageHead(flagName,
-                desc,
-                makeAPIInclude('flags', flagName),
-                None, None,
-                txt,
-                fp)
-    refPageTail(pageName=flagName,
-                specType=pi.spec,
-                specAnchor=pi.anchor,
-                seeAlso=seeAlsoList(flagName, None),
-                fp=fp,
-                auto=True)
-    fp.close()
+        refPageHead(flagName,
+                    desc,
+                    makeAPIInclude('flags', flagName),
+                    None, None,
+                    txt,
+                    fp)
+        refPageTail(pageName=flagName,
+                    specType=pi.spec,
+                    specAnchor=pi.anchor,
+                    seeAlso=seeAlsoList(flagName, None),
+                    fp=fp,
+                    auto=True)
 
 
 def autoGenHandlePage(baseDir, handleName):
@@ -607,37 +599,40 @@ def autoGenHandlePage(baseDir, handleName):
     - handleName - API handle name"""
     # @@ Need to determine creation function & add handles/ include for the
     # @@ interface in generator.py.
-    pageName = baseDir + '/' + handleName + '.txt'
-    fp = open(pageName, 'w', encoding='utf-8')
+    pageName = f'{baseDir}/{handleName}.txt'
+    with open(pageName, 'w', encoding='utf-8') as fp:
+        # Add a dictionary entry for this page
+        global genDict
+        genDict[handleName] = None
+        logDiag('autoGenHandlePage:', pageName)
 
-    # Add a dictionary entry for this page
-    global genDict
-    genDict[handleName] = None
-    logDiag('autoGenHandlePage:', pageName)
+            # Short description
+        desc = f'{apiName} object handle'
 
-    # Short description
-    desc = apiName + ' object handle'
+        descText = ''.join(
+            (
+                f'sname:{handleName}',
+                ' is an object handle type, referring to an object used\n',
+                f'by the {apiName}'
+                + ' implementation. These handles are created or allocated\n',
+                f'by the @@ TBD @@ function, and used by other {apiName}'
+                + ' structures\n',
+                'and commands in the See Also section below.\n',
+            )
+        )
 
-    descText = ''.join((
-        'sname:' + handleName,
-        ' is an object handle type, referring to an object used\n',
-        'by the ' + apiName + ' implementation. These handles are created or allocated\n',
-        'by the @@ TBD @@ function, and used by other ' + apiName + ' structures\n',
-        'and commands in the See Also section below.\n'))
-
-    refPageHead(handleName,
-                desc,
-                makeAPIInclude('handles', handleName),
-                None, None,
-                descText,
-                fp)
-    refPageTail(pageName=handleName,
-                specType=pi.spec,
-                specAnchor=pi.anchor,
-                seeAlso=seeAlsoList(handleName, None),
-                fp=fp,
-                auto=True)
-    fp.close()
+        refPageHead(handleName,
+                    desc,
+                    makeAPIInclude('handles', handleName),
+                    None, None,
+                    descText,
+                    fp)
+        refPageTail(pageName=handleName,
+                    specType=pi.spec,
+                    specAnchor=pi.anchor,
+                    seeAlso=seeAlsoList(handleName, None),
+                    fp=fp,
+                    auto=True)
 
 
 def genRef(specFile, baseDir):
@@ -654,7 +649,7 @@ def genRef(specFile, baseDir):
     specDir = os.path.dirname(os.path.abspath(specFile))
 
     pageMap = findRefs(file, specFile)
-    logDiag(specFile + ': found', len(pageMap.keys()), 'potential pages')
+    logDiag(f'{specFile}: found', len(pageMap.keys()), 'potential pages')
 
     sys.stderr.flush()
 
@@ -692,7 +687,7 @@ def genRef(specFile, baseDir):
         printPageInfo(pi, file)
 
         if pi.Warning:
-            logDiag('genRef:', pi.name + ':', pi.Warning)
+            logDiag('genRef:', f'{pi.name}:', pi.Warning)
 
         if pi.extractPage:
             emitPage(baseDir, specDir, pi, file)
@@ -721,17 +716,20 @@ def genSinglePageRef(baseDir):
 
     printCopyrightSourceComments(head)
 
-    print('= ' + apiName + ' API Reference Pages',
-          ':data-uri:',
-          ':icons: font',
-          ':doctype: book',
-          ':numbered!:',
-          ':max-width: 200',
-          ':data-uri:',
-          ':toc2:',
-          ':toclevels: 2',
-          '',
-          sep='\n', file=head)
+    print(
+        f'= {apiName} API Reference Pages',
+        ':data-uri:',
+        ':icons: font',
+        ':doctype: book',
+        ':numbered!:',
+        ':max-width: 200',
+        ':data-uri:',
+        ':toc2:',
+        ':toclevels: 2',
+        '',
+        sep='\n',
+        file=head,
+    )
 
     print('== Copyright', file=head)
     print('', file=head)
@@ -742,15 +740,15 @@ def genSinglePageRef(baseDir):
     # this for us.
 
     sections = [
-        [api.protos,       'protos',       apiName + ' Commands'],
-        [api.handles,      'handles',      'Object Handles'],
-        [api.structs,      'structs',      'Structures'],
-        [api.enums,        'enums',        'Enumerations'],
-        [api.flags,        'flags',        'Flags'],
+        [api.protos, 'protos', f'{apiName} Commands'],
+        [api.handles, 'handles', 'Object Handles'],
+        [api.structs, 'structs', 'Structures'],
+        [api.enums, 'enums', 'Enumerations'],
+        [api.flags, 'flags', 'Flags'],
         [api.funcpointers, 'funcpointers', 'Function Pointer Types'],
-        [api.basetypes,    'basetypes',    apiName + ' Scalar types'],
-        [api.defines,      'defines',      'C Macro Definitions'],
-        [extensions,       'extensions',   apiName + ' Extensions']
+        [api.basetypes, 'basetypes', f'{apiName} Scalar types'],
+        [api.defines, 'defines', 'C Macro Definitions'],
+        [extensions, 'extensions', f'{apiName} Extensions'],
     ]
 
     # Accumulate body of page
@@ -758,55 +756,35 @@ def genSinglePageRef(baseDir):
 
     for (apiDict, label, title) in sections:
         # Add section title/anchor header to body
-        anchor = '[[' + label + ',' + title + ']]'
-        print(anchor,
-              '== ' + title,
-              '',
-              ':leveloffset: 2',
-              '',
-              sep='\n', file=body)
+        anchor = f'[[{label},{title}]]'
+        print(anchor, f'== {title}', '', ':leveloffset: 2', '', sep='\n', file=body)
 
-        if label == 'extensions':
-            # preserve order of extensions since we already sorted the way we want.
-            keys = apiDict.keys()
-        else:
-            keys = sorted(apiDict.keys())
-
+        keys = apiDict.keys() if label == 'extensions' else sorted(apiDict.keys())
         for refPage in keys:
             # Do not generate links for aliases, which are included with the
             # aliased page
-            if refPage not in api.alias:
-                # Add page to body
-                if 'FlagBits' in refPage and conventions.unified_flag_refpages:
-                    # OpenXR does not create separate ref pages for FlagBits:
-                    # the FlagBits includes go in the Flags refpage.
-                    # Previously the Vulkan script would only emit non-empty
-                    # Vk*Flags pages, via the logic
-                    #   if refPage not in api.flags or api.flags[refPage] is not None
-                    #       emit page
-                    # Now, all are emitted.
-                    continue
-                else:
-                    print('include::' + refPage + '.txt[]', file=body)
-            else:
+            if refPage in api.alias:
                 # Alternatively, we could (probably should) link to the
                 # aliased refpage
                 logWarn('(Benign) Not including', refPage,
                         'in single-page reference',
                         'because it is an alias of', api.alias[refPage])
 
+            elif (
+                'FlagBits' not in refPage
+                or not conventions.unified_flag_refpages
+            ):
+                print(f'include::{refPage}.txt[]', file=body)
         print('\n' + ':leveloffset: 0' + '\n', file=body)
 
     # Write head and body to the output file
-    pageName = baseDir + '/apispec.txt'
-    fp = open(pageName, 'w', encoding='utf-8')
+    pageName = f'{baseDir}/apispec.txt'
+    with open(pageName, 'w', encoding='utf-8') as fp:
+        print(head.getvalue(), file=fp, end='')
+        print(body.getvalue(), file=fp, end='')
 
-    print(head.getvalue(), file=fp, end='')
-    print(body.getvalue(), file=fp, end='')
-
-    head.close()
-    body.close()
-    fp.close()
+        head.close()
+        body.close()
 
 
 def genExtension(baseDir, extpath, name, info):
@@ -848,7 +826,7 @@ def genExtension(baseDir, extpath, name, info):
             continue
 
         if req_name not in genDict:
-            logWarn('ERROR: {} (in extension {}) does not have a ref page.'.format(req_name, name))
+            logWarn(f'ERROR: {req_name} (in extension {name}) does not have a ref page.')
 
         declares.append(req_name)
 
@@ -856,11 +834,9 @@ def genExtension(baseDir, extpath, name, info):
     tail_content = None
     if extpath is not None:
         try:
-            appPath = extpath + '/' + conventions.extension_file_path(name)
-            appfp = open(appPath, 'r', encoding='utf-8')
-            appbody = appfp.read()
-            appfp.close()
-
+            appPath = f'{extpath}/{conventions.extension_file_path(name)}'
+            with open(appPath, 'r', encoding='utf-8') as appfp:
+                appbody = appfp.read()
             # Transform internal links to crosslinks
             specURL = conventions.specURL()
             appbody = xrefRewrite(appbody, specURL)
@@ -877,41 +853,32 @@ def genExtension(baseDir, extpath, name, info):
         tail_content = makeExtensionInclude(name)
 
     # Write the extension refpage
-    pageName = baseDir + '/' + name + '.txt'
+    pageName = f'{baseDir}/{name}.txt'
     logDiag('genExtension:', pageName)
-    fp = open(pageName, 'w', encoding='utf-8')
+    with open(pageName, 'w', encoding='utf-8') as fp:
+        # OpenXR-specific
+        sections = OrderedDict()
+        sections['Specification'] = 'See link:{html_spec_relative}#%s[ %s] in the main specification for complete information.' % (
+            name, name)
 
-    # OpenXR-specific
-    sections = OrderedDict()
-    sections['Specification'] = 'See link:{html_spec_relative}#%s[ %s] in the main specification for complete information.' % (
-        name, name)
+        refPageShell(
+            name,
+            f"{ext_type} extension",
+            fp,
+            appbody,
+            sections=sections,
+            tail_content=tail_content,
+        )
 
-    refPageShell(name,
-                 "{} extension".format(ext_type),
-                 fp,
-                 appbody,
-                 sections=sections,
-                 tail_content=tail_content)
-
-    # Restore leveloffset for boilerplate in refPageTail
-    if conventions.include_extension_appendix_in_refpage:
-        # The generated metadata include (refpage.extensionname.adoc) moved
-        # the leveloffset attribute by -1 to account for the relative
-        # structuring of the spec extension appendix section structure vs.
-        # the refpages.
-        # This restores leveloffset for the boilerplate in refPageTail.
-        leveloffset = 1
-    else:
-        leveloffset = 0
-
-    refPageTail(pageName=name,
-                specType=None,
-                specAnchor=name,
-                seeAlso=seeAlsoList(name, declares),
-                fp=fp,
-                auto=True,
-                leveloffset=leveloffset)
-    fp.close()
+            # Restore leveloffset for boilerplate in refPageTail
+        leveloffset = 1 if conventions.include_extension_appendix_in_refpage else 0
+        refPageTail(pageName=name,
+                    specType=None,
+                    specAnchor=name,
+                    seeAlso=seeAlsoList(name, declares),
+                    fp=fp,
+                    auto=True,
+                    leveloffset=leveloffset)
 
 
 if __name__ == '__main__':
@@ -970,7 +937,7 @@ if __name__ == '__main__':
     xrefRewriteInitialize()
 
     if results.baseDir is None:
-        baseDir = results.genpath + '/ref'
+        baseDir = f'{results.genpath}/ref'
     else:
         baseDir = results.baseDir
 
@@ -979,7 +946,7 @@ if __name__ == '__main__':
 
     for file in results.files:
         d = genRef(file, baseDir)
-        pages.update(d)
+        pages |= d
 
     # Now figure out which pages were not generated from the spec.
     # This relies on the dictionaries of API constructs in the api module.
@@ -994,9 +961,12 @@ if __name__ == '__main__':
         if conventions.write_refpage_include:
             # Only extensions with a supported="..." attribute in this set
             # will be considered for extraction/generation.
-            supported_strings = set((conventions.xml_api_name,))
-            ext_names = set(k for k, v in registry.extdict.items()
-                            if v.supported in supported_strings)
+            supported_strings = {conventions.xml_api_name}
+            ext_names = {
+                k
+                for k, v in registry.extdict.items()
+                if v.supported in supported_strings
+            }
 
             desired_extensions = ext_names.intersection(set(results.extension))
             for prefix in conventions.extension_index_prefixes:
@@ -1022,13 +992,13 @@ if __name__ == '__main__':
         #        autoGenHandlePage(baseDir, page)
 
         sections = [
-            (api.flags,        'Flag Types'),
-            (api.enums,        'Enumerated Types'),
-            (api.structs,      'Structures'),
-            (api.protos,       'Prototypes'),
+            (api.flags, 'Flag Types'),
+            (api.enums, 'Enumerated Types'),
+            (api.structs, 'Structures'),
+            (api.protos, 'Prototypes'),
             (api.funcpointers, 'Function Pointers'),
-            (api.basetypes,    apiName + ' Scalar Types'),
-            (extensions,       apiName + ' Extensions'),
+            (api.basetypes, f'{apiName} Scalar Types'),
+            (extensions, f'{apiName} Extensions'),
         ]
 
         # Summarize pages that were not generated, for good or bad reasons
@@ -1053,55 +1023,45 @@ if __name__ == '__main__':
         genSinglePageRef(baseDir)
 
     if results.rewrite:
-        # Generate Apache rewrite directives for refpage aliases
-        fp = open(results.rewrite, 'w', encoding='utf-8')
+        with open(results.rewrite, 'w', encoding='utf-8') as fp:
+            for page in sorted(pages):
+                p = pages[page]
+                rewrite = p.name
 
-        for page in sorted(pages):
-            p = pages[page]
-            rewrite = p.name
-
-            if page != rewrite:
-                print('RewriteRule ^', page, '.html$ ', rewrite, '.html',
-                      sep='', file=fp)
-        fp.close()
-
+                if page != rewrite:
+                    print('RewriteRule ^', page, '.html$ ', rewrite, '.html',
+                          sep='', file=fp)
     if results.toc:
-        # Generate dynamic portion of refpage TOC
-        fp = open(results.toc, 'w', encoding='utf-8')
+        with open(results.toc, 'w', encoding='utf-8') as fp:
+            # Run through dictionary of pages generating an TOC
+            print(12 * ' ', '<li class="Level1">Alphabetic Contents', sep='', file=fp)
+            print(16 * ' ', '<ul class="Level2">', sep='', file=fp)
+            lastLetter = None
 
-        # Run through dictionary of pages generating an TOC
-        print(12 * ' ', '<li class="Level1">Alphabetic Contents', sep='', file=fp)
-        print(16 * ' ', '<ul class="Level2">', sep='', file=fp)
-        lastLetter = None
+            for page in sorted(pages, key=str.upper):
+                p = pages[page]
+                letter = page[:1].upper()
 
-        for page in sorted(pages, key=str.upper):
-            p = pages[page]
-            letter = page[0:1].upper()
+                if letter != lastLetter:
+                    if lastLetter:
+                        # End previous block
+                        print(24 * ' ', '</ul>', sep='', file=fp)
+                        print(20 * ' ', '</li>', sep='', file=fp)
+                    # Start new block
+                    print(20 * ' ', '<li>', letter, sep='', file=fp)
+                    print(24 * ' ', '<ul class="Level3">', sep='', file=fp)
+                    lastLetter = letter
 
-            if letter != lastLetter:
-                if lastLetter:
-                    # End previous block
-                    print(24 * ' ', '</ul>', sep='', file=fp)
-                    print(20 * ' ', '</li>', sep='', file=fp)
-                # Start new block
-                print(20 * ' ', '<li>', letter, sep='', file=fp)
-                print(24 * ' ', '<ul class="Level3">', sep='', file=fp)
-                lastLetter = letter
+                # Add this page to the list
+                print(28 * ' ', '<li><a href="', p.name, '.html" ',
+                      'target="pagedisplay">', page, '</a></li>',
+                      sep='', file=fp)
 
-            # Add this page to the list
-            print(28 * ' ', '<li><a href="', p.name, '.html" ',
-                  'target="pagedisplay">', page, '</a></li>',
-                  sep='', file=fp)
+            if lastLetter:
+                # Close the final letter block
+                print(24 * ' ', '</ul>', sep='', file=fp)
+                print(20 * ' ', '</li>', sep='', file=fp)
 
-        if lastLetter:
-            # Close the final letter block
-            print(24 * ' ', '</ul>', sep='', file=fp)
-            print(20 * ' ', '</li>', sep='', file=fp)
-
-        # Close the list
-        print(16 * ' ', '</ul>', sep='', file=fp)
-        print(12 * ' ', '</li>', sep='', file=fp)
-
-        # print('name {} -> page {}'.format(page, pages[page].name))
-
-        fp.close()
+            # Close the list
+            print(16 * ' ', '</ul>', sep='', file=fp)
+            print(12 * ' ', '</li>', sep='', file=fp)

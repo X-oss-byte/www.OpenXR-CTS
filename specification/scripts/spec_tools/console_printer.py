@@ -91,13 +91,13 @@ def printLineSubsetWithHighlighting(
 
     tildeLength = highlightEnd - highlightStart - 1
     caretLoc = highlightStart
-    continuation = '[...]'
-
     if len(line) > maxLen:
         # Too long
 
         # the max is to handle -1 from .find() (which indicates "not found")
         followingSpaceIndex = max(end, line.find(' ', min(len(line), end + 1)))
+
+        continuation = '[...]'
 
         # Maximum length has decreased by at least
         # the length of a single continuation we absolutely need.
@@ -135,7 +135,7 @@ def printLineSubsetWithHighlighting(
 
     spaces = ' ' * caretLoc
     tildes = '~' * tildeLength
-    print(spaces + colored('^' + tildes, 'green'))
+    print(spaces + colored(f'^{tildes}', 'green'))
     if replacement is not None:
         print(spaces + colored(replacement, 'green'))
 
@@ -158,12 +158,10 @@ class ConsolePrinter(BasePrinter):
         """
         self.output(checker)
         if broken_links:
-            broken = checker.getBrokenLinks()
-            if broken:
+            if broken := checker.getBrokenLinks():
                 self.outputBrokenLinks(checker, broken)
         if missing_includes:
-            missing = checker.getMissingUnreferencedApiIncludes()
-            if missing:
+            if missing := checker.getMissingUnreferencedApiIncludes():
                 self.outputMissingIncludes(checker, missing)
 
     def outputBrokenLinks(self, checker, broken):
@@ -212,8 +210,7 @@ class ConsolePrinter(BasePrinter):
             print()
             print('--------------------------------------------------------------------')
 
-        fileAndLine = colored('{}:'.format(
-            self.formatBrief(msg.context)), attrs=['bold'])
+        fileAndLine = colored(f'{self.formatBrief(msg.context)}:', attrs=['bold'])
 
         headingSize = len('{context}: {mtype}: '.format(
             context=self.formatBrief(msg.context),
@@ -224,8 +221,7 @@ class ConsolePrinter(BasePrinter):
         lines = msg.message[:]
         if msg.see_also:
             lines.append('See also:')
-            lines.extend(('  {}'.format(self.formatBrief(see))
-                          for see in msg.see_also))
+            lines.extend(f'  {self.formatBrief(see)}' for see in msg.see_also)
 
         if msg.fix:
             lines.append('Note: Auto-fix available')
@@ -234,7 +230,7 @@ class ConsolePrinter(BasePrinter):
             if not printedHeading:
                 scriptloc = ''
                 if msg.script_location and self.show_script_location:
-                    scriptloc = ', ' + msg.script_location
+                    scriptloc = f', {msg.script_location}'
                 print('{fileLine} {mtype} {msg} (-{arg}{loc})'.format(
                     fileLine=fileAndLine, mtype=msg.message_type.formattedWithColon(),
                     msg=colored(line, attrs=['bold']), arg=msg.message_id.enable_arg(), loc=scriptloc))

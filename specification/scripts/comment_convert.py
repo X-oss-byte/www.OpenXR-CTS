@@ -74,14 +74,12 @@ class CommentConverter(LinewiseFileProcessor):
             self.output_line(line)
         self.trailing_empty_lines = []
 
-        indent = indent + '    '
+        indent = f'{indent}    '
 
         def extract(line):
             match = COMMENT_RE.match(line)
             content = match.group('content')
-            if content:
-                return content
-            return ""
+            return content if content else ""
 
         # Extract comment content
         lines = [extract(line) for line in self.comment_lines]
@@ -96,8 +94,8 @@ class CommentConverter(LinewiseFileProcessor):
 
         # Add single- or multi-line-string quote
         if self.single_line_quotes \
-            and len(lines) == 1 \
-                and '"' not in lines[0]:
+                and len(lines) == 1 \
+                    and '"' not in lines[0]:
             quote = '"'
         else:
             quote = '"""'
@@ -135,10 +133,7 @@ class CommentConverter(LinewiseFileProcessor):
 
     def is_next_line_doc_comment(self):
         next_line = self.next_line_rstripped
-        if next_line is None:
-            return False
-
-        return next_line.strip().startswith('"')
+        return False if next_line is None else next_line.strip().startswith('"')
 
     def process_line(self, line_num, line):
         line = line.rstrip()

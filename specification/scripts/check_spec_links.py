@@ -25,15 +25,25 @@ from spec_tools.shared import MessageId
 EXTRA_DEFINES = ('XRAPI_ATTR', 'XRAPI_CALL', 'XRAPI_PTR', 'XR_NO_STDINT_H')
 
 # These are marked with the code: macro
-SYSTEM_TYPES = set(('void', 'char', 'float', 'size_t',
-                    'intptr_t', 'uintptr_t',
-                    'int8_t', 'uint8_t',
-                    'int16_t', 'uint16_t',
-                    'int32_t', 'uint32_t',
-                    'int64_t', 'uint64_t'))
+SYSTEM_TYPES = {
+    'void',
+    'char',
+    'float',
+    'size_t',
+    'intptr_t',
+    'uintptr_t',
+    'int8_t',
+    'uint8_t',
+    'int16_t',
+    'uint16_t',
+    'int32_t',
+    'uint32_t',
+    'int64_t',
+    'uint64_t',
+}
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_DISABLED_MESSAGES = set((MessageId.REFPAGE_MISSING,))
+DEFAULT_DISABLED_MESSAGES = {MessageId.REFPAGE_MISSING}
 
 CWD = Path('.').resolve()
 

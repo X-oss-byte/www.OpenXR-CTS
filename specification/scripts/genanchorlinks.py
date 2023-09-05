@@ -12,7 +12,7 @@ def genAnchorLinks(in_file, out_file):
         try:
                 with open(in_file, 'r', encoding='utf8') as f: data = f.read()
         except FileNotFoundError:
-                print('Error: File %s does not exist.' % in_file)
+                print(f'Error: File {in_file} does not exist.')
                 sys.exit(2)
 
         data = re.sub( r'(<a )(id="(VUID\-[\w\-:]+)")(>)', '\g<1>\g<2> href="#\g<3>"\g<4>', data)

@@ -26,8 +26,7 @@ def _human_readable_deref(val, make_param_name=None):
             parts.append('member of')
         if brackets:
             parts.append('each element of')
-        parts.append('the')
-        parts.append(name)
+        parts.extend(('the', name))
     parts.append('parameter')
     return ' '.join(parts)
 
@@ -69,7 +68,7 @@ class LengthEntry:
 
     def __repr__(self):
         "Formats an object for repr(), debugger display, etc."
-        return 'spec_tools.attributes.LengthEntry("{}")'.format(self.full_reference)
+        return f'spec_tools.attributes.LengthEntry("{self.full_reference}")'
 
     @staticmethod
     def parse_len_from_param(param):
@@ -110,7 +109,7 @@ class ExternSyncEntry:
 
     def __repr__(self):
         "Formats an object for repr(), debugger display, etc."
-        return 'spec_tools.attributes.ExternSyncEntry("{}")'.format(self.full_reference)
+        return f'spec_tools.attributes.ExternSyncEntry("{self.full_reference}")'
 
 
 _TRUE_STRING = 'true'

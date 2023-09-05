@@ -56,31 +56,18 @@ def get_extension_commands(reg):
 
 
 def get_enum_value_names(reg, enum_type):
-    names = set()
     result_elem = reg.groupdict[enum_type].elem
-    for val in result_elem.findall("./enum[@name]"):
-        names.add(val.get("name"))
-    return names
+    return {val.get("name") for val in result_elem.findall("./enum[@name]")}
 
 
 # Enum type "names" whose value names don't fit the standard pattern.
-ENUM_NAMING_EXCEPTIONS = set((
-    # Intentional exceptions:
-    # shortened
+ENUM_NAMING_EXCEPTIONS = {
     _TYPEENUM,
-    # shortened/more useful
     "XrResult",
-    # not actually a single cohesive enum, just a collection of defines
     "API Constants",
-
-    # Legacy mistake (shortened and not caught before release)
-    # See https://gitlab.khronos.org/openxr/openxr/issues/1317
     "XrPerfSettingsNotificationLevelEXT",
-
-    # Longest shared prefix is very long, and we want to remain able
-    # to add additional flags with a shorter shared prefix.
     "XrRenderModelFlagBitsFB",
-))
+}
 
 SPECIFICATION_DIR = Path(__file__).parent.parent
 
@@ -91,25 +78,23 @@ REVISION_RE = re.compile(r' *[*] Revision (?P<num>[1-9][0-9]*),.*')
 def get_extension_source(extname):
     match = EXT_DECOMPOSE_RE.match(extname)
     if not match:
-        raise RuntimeError("Could not decompose " + extname)
+        raise RuntimeError(f"Could not decompose {extname}")
 
     lower_tag = match.group('tag').lower()
     lower_name = match.group('name').lower()
-    fn = '{}_{}.adoc'.format(lower_tag, lower_name)
+    fn = f'{lower_tag}_{lower_name}.adoc'
     return str(SPECIFICATION_DIR / 'sources' / 'chapters' / 'extensions' / lower_tag / fn)
 
 
 def get_extension_vendor(extname):
-    match = EXT_DECOMPOSE_RE.match(extname)
-    if not match:
-        raise RuntimeError("Could not decompose " + extname)
-    return match.group('tag')
+    if match := EXT_DECOMPOSE_RE.match(extname):
+        return match.group('tag')
+    else:
+        raise RuntimeError(f"Could not decompose {extname}")
 
 
 def pluralize(s):
-    if s.endswith('y'):
-        return s[:-1] + 'ies'
-    return s + 's'
+    return f'{s[:-1]}ies' if s.endswith('y') else f'{s}s'
 
 
 class EntityDatabase(OrigEntityDatabase):
@@ -175,7 +160,7 @@ class Checker(XMLChecker):
         # may be returned by a command
         # (eg. XR_ERROR_SESSION_RUNNING and XR_ERROR_SESSION_NOT_RUNNING)
         self.exclusive_return_code_sets = (
-            set(("XR_ERROR_SESSION_NOT_RUNNING", "XR_ERROR_SESSION_RUNNING")),
+            {"XR_ERROR_SESSION_NOT_RUNNING", "XR_ERROR_SESSION_RUNNING"},
         )
 
         # Keys are entity names, values are tuples or lists of message text to suppress.
@@ -216,7 +201,7 @@ class Checker(XMLChecker):
 
     def check_enum_naming(self, enum_type):
         stripped_enum_type, enum_tag = self.strip_extension_tag(enum_type)
-        end = "_{}".format(enum_tag) if enum_tag else ""
+        end = f"_{enum_tag}" if enum_tag else ""
         bare_end = None
         if stripped_enum_type.endswith("FlagBits"):
             bare_end = "_BIT"
@@ -308,9 +293,7 @@ class Checker(XMLChecker):
 
         codes = successcodes.union(errorcodes)
 
-        # Check that all return codes are recognized.
-        unrecognized = codes - self.return_codes
-        if unrecognized:
+        if unrecognized := codes - self.return_codes:
             self.record_error("Unrecognized return code(s):",
                               unrecognized)
 
@@ -346,7 +329,7 @@ class Checker(XMLChecker):
         assert type_elem is not None
 
         tail = type_elem.tail.strip()
-        if '*' != tail:
+        if tail != '*':
             self.record_error('Two-call-idiom call has count parameter', param_name,
                               'that is not a pointer:', type_elem.text, type_elem.tail)
 
@@ -414,17 +397,21 @@ class Checker(XMLChecker):
         count_output_param_match = None
         array_param_name = None
         for param_name, param_elem in named_params:
-            match = CAPACITY_INPUT_RE.match(param_name)
-            if match:
+            if match := CAPACITY_INPUT_RE.match(param_name):
                 capacity_input_param_name = param_name
                 capacity_input_param_match = match
-                self.check_two_call_capacity_input(param_name, param_elem, match)
+                self.check_two_call_capacity_input(
+                    capacity_input_param_name,
+                    param_elem,
+                    capacity_input_param_match,
+                )
                 continue
-            match = COUNT_OUTPUT_RE.match(param_name)
-            if match:
+            if match := COUNT_OUTPUT_RE.match(param_name):
                 count_output_param_name = param_name
                 count_output_param_match = match
-                self.check_two_call_count_output(param_name, param_elem, match)
+                self.check_two_call_count_output(
+                    count_output_param_name, param_elem, count_output_param_match
+                )
                 continue
 
             # Try detecting the output array using its length field
@@ -543,7 +530,7 @@ class Checker(XMLChecker):
 
         elem = info.elem
         name_upper = name.upper()
-        version_name = "{}_SPEC_VERSION".format(name)
+        version_name = f"{name}_SPEC_VERSION"
         enums = elem.findall('./require/enum[@name]')
         version_elem = findNamedElem(enums, version_name)
         if version_elem is None:
@@ -555,8 +542,7 @@ class Checker(XMLChecker):
                 with open(fn, 'r', encoding='utf-8') as fp:
                     for line in fp:
                         line = line.rstrip()
-                        match = REVISION_RE.match(line)
-                        if match:
+                        if match := REVISION_RE.match(line):
                             revisions.append(int(match.group('num')))
                 ver_from_xml = version_elem.get('value')
                 if revisions:
@@ -564,26 +550,25 @@ class Checker(XMLChecker):
                     if ver_from_xml != ver_from_text:
                         self.record_error("Version enum mismatch: spec text indicates", ver_from_text,
                                           "but XML says", ver_from_xml)
+                elif ver_from_xml == '1':
+                    self.record_warning(
+                        "Cannot find version history in spec text - make sure it has lines starting exactly like '* Revision 1, ....'",
+                        filename=fn)
                 else:
-                    if ver_from_xml == '1':
-                        self.record_warning(
-                            "Cannot find version history in spec text - make sure it has lines starting exactly like '* Revision 1, ....'",
-                            filename=fn)
-                    else:
-                        self.record_error("Cannot find version history in spec text, but XML reports a non-1 version number", ver_from_xml,
-                                          " - make sure the spec text has lines starting exactly like '* Revision 1, ....'",
-                                          filename=fn)
+                    self.record_error("Cannot find version history in spec text, but XML reports a non-1 version number", ver_from_xml,
+                                      " - make sure the spec text has lines starting exactly like '* Revision 1, ....'",
+                                      filename=fn)
             except FileNotFoundError:
                 # This is OK: just means we can't check against the spec text.
                 pass
 
-        name_define = "{}_EXTENSION_NAME".format(name_upper)
+        name_define = f"{name_upper}_EXTENSION_NAME"
         name_elem = findNamedElem(enums, name_define)
         if name_elem is None:
             self.record_error("Missing name enum", name_define)
         else:
             # Note: etree handles the XML entities here and turns &quot; back into "
-            expected_name = '"{}"'.format(name)
+            expected_name = f'"{name}"'
             name_val = name_elem.get('value')
             if name_val != expected_name:
                 self.record_error("Incorrect name enum: expected", expected_name,
@@ -591,7 +576,7 @@ class Checker(XMLChecker):
 
         vendor = get_extension_vendor(name)
         for category in ('enum', 'type', 'command'):
-            items = elem.findall('./require/%s' % category)
+            items = elem.findall(f'./require/{category}')
             for item in items:
                 item_name = item.get('name')
                 # print(item.attrib)

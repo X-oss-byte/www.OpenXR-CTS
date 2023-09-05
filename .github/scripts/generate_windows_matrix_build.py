@@ -10,7 +10,5 @@ from shared import BUILD_CONFIGS, output_json
 if __name__ == "__main__":
 
     matrix = {"include": [{"preset": c.preset()} for c in BUILD_CONFIGS]}
-    var_name = None
-    if len(sys.argv) >= 2:
-        var_name = sys.argv[1]
+    var_name = sys.argv[1] if len(sys.argv) >= 2 else None
     output_json(matrix, variable_name=var_name)

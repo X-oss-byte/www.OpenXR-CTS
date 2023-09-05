@@ -43,9 +43,7 @@ class LinewiseFileProcessor:
     @property
     def line_rstripped(self):
         """The current line without any trailing whitespace."""
-        if self.line is None:
-            return None
-        return self.line.rstrip()
+        return None if self.line is None else self.line.rstrip()
 
     @property
     def trailing_whitespace(self):
@@ -61,9 +59,7 @@ class LinewiseFileProcessor:
     @property
     def next_line_rstripped(self):
         """Peek at the next line, if any, without any trailing whitespace."""
-        if self.next_line is None:
-            return None
-        return self.next_line.rstrip()
+        return None if self.next_line is None else self.next_line.rstrip()
 
     def get_preceding_line(self, relative_index=-1):
         """Retrieve the line at an line number at the given relative index, if one exists. Returns None if there is no line there."""

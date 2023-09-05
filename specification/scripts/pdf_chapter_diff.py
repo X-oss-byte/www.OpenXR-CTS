@@ -53,15 +53,13 @@ class Section:
 
     @property
     def section_number(self):
-        match = NUMBERED_TITLE_RE.match(self.title)
-        if match:
+        if match := NUMBERED_TITLE_RE.match(self.title):
             return match.group('section_num')
         return None
 
     @property
     def title_text(self):
-        match = NUMBERED_TITLE_RE.match(self.title)
-        if match:
+        if match := NUMBERED_TITLE_RE.match(self.title):
             return match.group('title_text')
         return self.title
 
@@ -86,7 +84,7 @@ class Section:
 
 def add_nested_title(bookmarks):
     title_stack = []
-    for i, bookmark in enumerate(bookmarks):
+    for bookmark in bookmarks:
         while bookmark.level >= len(title_stack):
             title_stack.pop()
         title_stack.append(bookmark.title)
@@ -166,9 +164,7 @@ class PdfSpec:
         return self._page_pdfs
 
     def pdf_for_page(self, pagenum):
-        if pagenum is None:
-            return None
-        return self.page_pdfs[pagenum]
+        return None if pagenum is None else self.page_pdfs[pagenum]
 
     def compute_sections(self,
                          level=None,
@@ -213,10 +209,6 @@ class PdfSpec:
                     sec.page_end_bottom = bookmark.top
                 sections.append(sec)
             prev_bookmark = bookmark
-        if bookmark is not None:
-            # TODO Deal with the last section here!
-            pass
-
         # Now, populate the object fields
         self.comparable_sections = sections
         self.section_by_title = {sec.title: sec
@@ -232,18 +224,15 @@ class PdfSpec:
 
     def find_corresponding_section(self, section):
         """Find our own section corresponding to the supplied section from another PDF."""
-        own_section = self.section_by_title.get(section.title)
-        if own_section:
+        if own_section := self.section_by_title.get(section.title):
             # Easy - full title matches
             return own_section
 
-        own_section = self.section_by_title_text.get(section.title_text)
-        if own_section:
+        if own_section := self.section_by_title_text.get(section.title_text):
             # Not as easy, we had a section renumber, possible issue here!
             return own_section
 
-        own_section = self.section_by_number.get(section.section_number)
-        if own_section:
+        if own_section := self.section_by_number.get(section.section_number):
             # Only the section number matched - WARNING! might be bad match!
             return own_section
 
@@ -259,25 +248,14 @@ class MatchingSection:
     changes = attr.ib(default=None)
 
     def __str__(self):
-        return '{} ({}:{}-{}, {}:{}-{})'.format(
-            self.title,
-
-            self.orig_range['fn'],
-            self.orig_range['page_start'],
-            self.orig_range['page_end'],
-
-            self.new_range['fn'],
-            self.new_range['page_start'],
-            self.new_range['page_end'],
-        )
+        return f"{self.title} ({self.orig_range['fn']}:{self.orig_range['page_start']}-{self.orig_range['page_end']}, {self.new_range['fn']}:{self.new_range['page_start']}-{self.new_range['page_end']})"
 
 
 def get_section_range_pairs(orig_section, new_pdf):
     """Return MatchingSection for a section."""
     other_section = new_pdf.find_corresponding_section(orig_section)
     if not other_section:
-        print("Skipping section {} - no match in the other doc!".format(
-            orig_section.title))
+        print(f"Skipping section {orig_section.title} - no match in the other doc!")
         return None
     return MatchingSection(
         title=orig_section.title,
@@ -289,8 +267,7 @@ def get_section_page_pairs(orig_section, new_pdf):
     """Return (orig_page_num, new_page_num) pairs for each page in section."""
     other_section = new_pdf.find_corresponding_section(orig_section)
     if not other_section:
-        print("Skipping section {} - no match in the other doc!".format(
-            orig_section.title))
+        print(f"Skipping section {orig_section.title} - no match in the other doc!")
         return []
     return zip_longest(orig_section.page_numbers, other_section.page_numbers)
 
@@ -319,14 +296,13 @@ def get_all_page_pairs(orig_pdf, new_pdf):
     # we can drop the (2, None) pair because the original page 2
     # is already being compared against the new page 1 -- see the (2, 1) --
     # so there's no sense in saying it only exists in the original.
-    unique_full_pairs = set(((orig_page, new_page)
-                             for orig_page, new_page in raw_pairs
-                             if orig_page is not None
-                             and new_page is not None))
-    skip_orig_only = set(((orig_page, None)
-                          for orig_page, _ in unique_full_pairs))
-    skip_new_only = set(((None, new_page)
-                         for _, new_page in unique_full_pairs))
+    unique_full_pairs = {
+        (orig_page, new_page)
+        for orig_page, new_page in raw_pairs
+        if orig_page is not None and new_page is not None
+    }
+    skip_orig_only = {(orig_page, None) for orig_page, _ in unique_full_pairs}
+    skip_new_only = {(None, new_page) for _, new_page in unique_full_pairs}
     skip_half_pairs = skip_orig_only.union(skip_new_only)
 
     # Main filter pass: deduplicate and filter out excluded half-diffs
@@ -366,13 +342,9 @@ class SequenceGapFinder:
 
 def zip_longest_permitting_none(a, b):
     """Do zip_longest except treat None as a zero-element iterable."""
-    if a is None and b is None:
-        return ()
     if a is None:
-        return ((None, elt) for elt in b)
-    if b is None:
-        return ((elt, None) for elt in a)
-    return zip_longest(a, b)
+        return () if b is None else ((None, elt) for elt in b)
+    return ((elt, None) for elt in a) if b is None else zip_longest(a, b)
 
 
 def fill_pair_gaps(pairs):
@@ -416,9 +388,9 @@ class GranularPdfDiff:
                 continue
             matching.orig_range["dom"] = self.orig_pdf.dom
             matching.new_range["dom"] = self.new_pdf.dom
-            changes = pdf_diff.compute_changes(
-                matching.orig_range, matching.new_range, bottom_margin=93)
-            if changes:
+            if changes := pdf_diff.compute_changes(
+                matching.orig_range, matching.new_range, bottom_margin=93
+            ):
                 matching.changes = changes
                 yield matching
             else:
@@ -444,8 +416,7 @@ class GranularPdfDiff:
     def generate_diff_from_pairs(self, pairs):
         out_docs = []
         for orig_page_num, new_page_num in pairs:
-            page_diff = self.generate_page_diff(orig_page_num, new_page_num)
-            if page_diff:
+            if page_diff := self.generate_page_diff(orig_page_num, new_page_num):
                 out_docs.append(page_diff)
         # TODO
 
@@ -464,9 +435,7 @@ if __name__ == "__main__":
             return True
         # All the individual sub-sections in the extension chapter
         # (one for each extension)
-        if bookmark.level == 2 and "XR_KHR" in bookmark.title:
-            return True
-        return False
+        return bookmark.level == 2 and "XR_KHR" in bookmark.title
 
     diff = GranularPdfDiff(ORIG, NEW)
     diff.compute_sections(bookmark_predicate=is_separate_diff_section)
